@@ -3,9 +3,10 @@ $CREATE_RELEASE()
 cd $FORGE_RELEASE_DIRECTORY
 
 npm install
-npm run build
 
 ln -s /mnt/volume-tor1-01/weatherfonts public/fonts
+
+npm run build
 
 $ACTIVATE_RELEASE()
 
