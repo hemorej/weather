@@ -13,6 +13,7 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       ],
       link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
         { rel: 'preload', href: '/fonts/HankenGrotesk-VariableFont_wght.ttf', as: 'font', type: 'font/ttf', crossorigin: '' },
       ],
     },
