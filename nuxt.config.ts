@@ -20,7 +20,7 @@ export default defineNuxtConfig({
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
         { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
         { rel: 'manifest', href: '/site.webmanifest' },
-        { rel: 'preload', href: '/fonts/HankenGrotesk-VariableFont_wght.ttf', as: 'font', type: 'font/ttf', crossorigin: '' },
+        { rel: 'preload', href: '/fonts/HankenGrotesk-VariableFont_wght.woff2', as: 'font', type: 'font/woff2', crossorigin: '' },
       ],
     },
   },
