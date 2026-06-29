@@ -128,7 +128,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     const [currentRes, hourlyRes, dailyRes, aqiRes] = await Promise.all([
       $fetch<{ data: OWMCurrentData[] }>(`${OWM}/data/4.0/onecall/current?${base}`),
       $fetch<{ data: OWMHourlyData[] }>(`${OWM}/data/4.0/onecall/timeline/1h?${base}&cnt=24`),
-      $fetch<{ data: OWMDailyData[] }>(`${OWM}/data/4.0/onecall/timeline/1day?${base}&cnt=7`),
+      $fetch<{ data: OWMDailyData[] }>(`${OWM}/data/4.0/onecall/timeline/1day?${base}&cnt=8`),
       $fetch<OWMAQIResponse>(`${OWM}/data/2.5/air_pollution?${base}`),
     ])
 
@@ -200,12 +200,12 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     })
 
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const daily = dailyRes.data.slice(0, 7).map((d, i) => {
+    const daily = dailyRes.data.slice(1, 8).map((d) => {
       const { cond } = d.weather?.[0]?.icon
         ? conditionFromIcon(d.weather[0].icon)
         : conditionFromClouds(d.clouds ?? 0, d.dt, cur.sunrise, cur.sunset)
       return {
-        dayLabel: i === 0 ? 'Today' : dayNames[new Date(d.dt * 1000).getDay()]!,
+        dayLabel: dayNames[new Date(d.dt * 1000).getDay()]!,
         conditionCode: cond,
         precip: Math.round(d.pop * 100),
         low: Math.round(d.temp.min),
