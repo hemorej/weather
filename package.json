@@ -17,7 +17,7 @@
     "@nuxt/devtools": "latest",
     "@types/node": "^26.0.1",
     "typescript": "^5.5.0",
-    "vue-tsc": "^2.1.0"
+    "vue-tsc": "^3.3.5"
   },
   "allowScripts": {
     "esbuild@0.28.1": true,
