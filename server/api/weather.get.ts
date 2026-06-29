@@ -146,17 +146,25 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     let alertText = 'None'
     if (cur.alerts && cur.alerts.length > 0) {
       try {
-        const alert = await $fetch<{ event: string }>(
-          `${OWM}/data/4.0/onecall/alert/${cur.alerts[0]}?appid=${key}`
-        )
-        const ev = alert.event.toLowerCase()
+        const alert = await $fetch<{
+          event: string
+          description?: Array<{ language: string; description: string }> | string
+        }>(`${OWM}/data/4.0/onecall/alert/${cur.alerts[0]}?appid=${key}`)
+
+        // Some regional alert sources (e.g. Environment Canada) leave `event` empty;
+        // fall back to scanning the English description for type keywords.
+        const engDesc = Array.isArray(alert.description)
+          ? (alert.description.find(d => d.language.startsWith('en'))?.description ?? '')
+          : (typeof alert.description === 'string' ? alert.description : '')
+        const searchText = (alert.event + ' ' + engDesc).toLowerCase()
+
         alertActive = true
-        if (ev.includes('heat') || ev.includes('excessive heat')) alertText = 'Heat'
-        else if (ev.includes('thunder') || ev.includes('storm')) alertText = 'Storm'
-        else if (ev.includes('wind') || ev.includes('gale')) alertText = 'Wind'
-        else if (ev.includes('flood')) alertText = 'Flood'
-        else if (ev.includes('freeze') || ev.includes('frost') || ev.includes('snow')) alertText = 'Ice'
-        else alertText = alert.event.split(' ')[0] ?? 'Alert'
+        if (searchText.includes('heat') || searchText.includes('humidex')) alertText = 'Heat'
+        else if (searchText.includes('thunder') || searchText.includes('storm')) alertText = 'Storm'
+        else if (searchText.includes('wind') || searchText.includes('gale')) alertText = 'Wind'
+        else if (searchText.includes('flood')) alertText = 'Flood'
+        else if (searchText.includes('freeze') || searchText.includes('frost') || searchText.includes('snow')) alertText = 'Ice'
+        else alertText = alert.event.split(' ')[0] || 'Alert'
       } catch {
         alertActive = true
         alertText = 'Alert'
