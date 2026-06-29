@@ -28,7 +28,7 @@ const hourlyEl    = ref<HTMLElement | null>(null)
 const cache    = useWeatherCache()
 const storage  = useLocationStorage()
 const geo      = useGeocoding()
-const { tintFor, barColorFor } = useTemperatureColor()
+const { tintFor } = useTemperatureColor()
 
 // ── Date string ───────────────────────────────────────────────────────────────
 const dateStr = computed(() => {
@@ -51,31 +51,11 @@ const indicators = computed(() => {
   ]
 })
 
-// ── Range bar bounds (across all 7 days) ──────────────────────────────────────
-const weekMin = computed(() =>
-  weatherData.value ? Math.min(...weatherData.value.daily.flatMap(d => [d.low, d.high])) : 0
-)
-const weekMax = computed(() =>
-  weatherData.value ? Math.max(...weatherData.value.daily.flatMap(d => [d.low, d.high])) : 30
-)
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function condIconName(cond: string, isNight: boolean): string {
   if (cond === 'clear') return isNight ? 'moon' : 'sun'
   if (cond === 'partly') return isNight ? 'partlyNight' : 'partly'
   return cond
-}
-
-function rangeBarStyle(low: number, high: number) {
-  const span = Math.max(1, weekMax.value - weekMin.value)
-  return {
-    position: 'absolute' as const,
-    left:   `${((low - weekMin.value) / span) * 100}%`,
-    width:  `${Math.max(8, ((high - low) / span) * 100)}%`,
-    top: '0', bottom: '0',
-    borderRadius: '4px',
-    background: `linear-gradient(90deg, ${barColorFor(low)}, ${barColorFor(high)})`,
-  }
 }
 
 // ── Weather fetch (cache-first, 10-min TTL) ───────────────────────────────────
@@ -189,10 +169,11 @@ function onCityBlur() {
 function onHourlyScroll() {
   const el = hourlyEl.value
   if (!el || !weatherData.value) return
-  const n = weatherData.value.hourly.length
-  if (!n) return
-  const idx = Math.max(0, Math.min(n - 1, Math.round(el.scrollLeft / (el.scrollWidth / n))))
-  bgColor.value = tintFor(weatherData.value.hourly[idx]!.temp)
+  const hrs = weatherData.value.hourly
+  if (!hrs.length) return
+  const rowH = 44
+  const idx = Math.max(0, Math.min(hrs.length - 1, Math.round(el.scrollTop / rowH)))
+  bgColor.value = tintFor(hrs[idx]!.temp)
 }
 
 // ── Mount ─────────────────────────────────────────────────────────────────────
@@ -214,15 +195,15 @@ onMounted(() => {
       <header style="flex-shrink:0;text-align:left;padding-top:clamp(34px,6.5vh,76px);">
 
         <!-- Temperature + date/city row -->
-        <div style="display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;">
           <!-- Temperature -->
           <div style="font-size:clamp(94px,17vw,126px);font-weight:200;line-height:.84;letter-spacing:-0.045em;color:#0f0f0f;">
             {{ weatherData ? `${weatherData.current.temp}°` : '—' }}
           </div>
 
           <!-- Date + city -->
-          <div style="padding-bottom:clamp(10px,2.2vh,22px);">
-            <div style="font-size:15px;font-weight:500;color:#9a9a9a;letter-spacing:.2px;margin-bottom:4px;">
+          <div style="padding-top:clamp(4px,1vh,10px);">
+            <div style="font-size:17px;font-weight:500;color:#9a9a9a;letter-spacing:.2px;margin-bottom:5px;">
               {{ dateStr }}
             </div>
 
@@ -311,52 +292,51 @@ onMounted(() => {
       </div>
 
       <template v-else>
-        <!-- ── HOURLY STRIP ──────────────────────────────────────────────────── -->
-        <section style="flex-shrink:0;margin-top:clamp(22px,3.6vh,34px);padding-bottom:18px;border-bottom:1px solid #eee;">
-          <div
-            ref="hourlyEl"
-            class="nb"
-            style="display:flex;gap:20px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;"
-            @scroll="onHourlyScroll"
-          >
-            <div
-              v-for="(h, i) in (weatherData?.hourly ?? [])"
-              :key="i"
-              style="flex-shrink:0;min-width:46px;display:flex;flex-direction:column;align-items:center;gap:9px;scroll-snap-align:start;"
-            >
-              <div :style="{ fontSize: '13px', color: i === 0 ? '#111' : '#8a8a8a', fontWeight: i === 0 ? 700 : 500 }">
-                {{ h.label }}
-              </div>
-              <WeatherIcon :name="condIconName(h.conditionCode, h.isNight)" :size="22" style="color:#3a3a3a;" />
-              <div style="font-size:15px;font-weight:500;color:#161616;">{{ h.temp }}°</div>
-              <div style="font-size:11px;font-weight:600;color:#6aa0d4;height:14px;">
-                {{ h.precip > 0 ? `${h.precip}%` : '' }}
-              </div>
-            </div>
-          </div>
-        </section>
+        <!-- ── FORECAST COLUMNS ─────────────────────────────────────────────── -->
+        <div style="flex-shrink:0;display:flex;gap:60px;margin-top:clamp(40px,7vh,72px);">
 
-        <!-- ── 7-DAY LIST ───────────────────────────────────────────────────── -->
-        <section
-          class="nb"
-          style="flex:1;overflow-y:auto;padding-top:4px;padding-bottom:20px;"
-        >
-          <div
-            v-for="(d, i) in (weatherData?.daily ?? [])"
-            :key="i"
-            style="display:grid;grid-template-columns:48px 28px 34px 1fr 34px;align-items:center;column-gap:14px;height:46px;border-bottom:1px solid #f4f4f4;"
-          >
-            <div style="font-size:14px;font-weight:500;color:#1a1a1a;">{{ d.dayLabel }}</div>
-            <div style="display:flex;justify-content:center;color:#3a3a3a;">
-              <WeatherIcon :name="condIconName(d.conditionCode, false)" :size="22" />
+          <!-- 7-Day column (left) -->
+          <section style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
+            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;margin-bottom:12px;flex-shrink:0;">7-Day</div>
+            <div class="nb" style="height:308px;overflow-y:auto;">
+              <div
+                v-for="(d, i) in (weatherData?.daily ?? [])"
+                :key="i"
+                style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:12px;height:44px;border-bottom:1px solid #f4f4f4;"
+              >
+                <div style="font-size:14px;font-weight:500;color:#1a1a1a;width:34px;">{{ d.dayLabel }}</div>
+                <div style="display:flex;justify-content:center;color:#2a2a2a;">
+                  <WeatherIcon :name="condIconName(d.conditionCode, false)" :size="22" />
+                </div>
+                <div style="text-align:right;white-space:nowrap;font-size:14px;letter-spacing:.01em;">
+                  <span style="font-weight:600;color:#141414;">{{ d.high }}°</span><span style="color:#d2d2d2;font-weight:400;margin:0 3px;">/</span><span style="font-weight:400;color:#b0b0b0;">{{ d.low }}°</span>
+                </div>
+              </div>
             </div>
-            <div style="font-size:14px;font-weight:400;color:#bcbcbc;text-align:right;">{{ d.low }}°</div>
-            <div style="position:relative;height:5px;border-radius:4px;background:#efefef;">
-              <div :style="rangeBarStyle(d.low, d.high)" />
+          </section>
+
+          <!-- Hourly column (right) -->
+          <section style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
+            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;margin-bottom:12px;flex-shrink:0;">Hourly</div>
+            <div ref="hourlyEl" class="nb" style="height:308px;overflow-y:auto;" @scroll="onHourlyScroll">
+              <div
+                v-for="(h, i) in (weatherData?.hourly ?? [])"
+                :key="i"
+                style="display:grid;grid-template-columns:34px 1fr 30px 34px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
+              >
+                <div :style="{ fontSize:'14px', fontWeight: i===0 ? 700 : 500, color: i===0 ? '#111' : '#8a8a8a', width:'34px' }">
+                  {{ h.label }}
+                </div>
+                <div style="display:flex;justify-content:center;color:#2a2a2a;">
+                  <WeatherIcon :name="condIconName(h.conditionCode, h.isNight)" :size="22" />
+                </div>
+                <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ h.temp }}°</div>
+                <div style="text-align:right;font-size:11px;font-weight:600;color:#6aa0d4;">{{ h.precip > 0 ? `${h.precip}%` : '' }}</div>
+              </div>
             </div>
-            <div style="font-size:14px;font-weight:500;color:#161616;text-align:right;">{{ d.high }}°</div>
-          </div>
-        </section>
+          </section>
+
+        </div>
       </template>
 
     </div>
@@ -368,7 +348,7 @@ onMounted(() => {
   background: none;
   border: none;
   font-family: inherit;
-  font-size: 21px;
+  font-size: 24px;
   font-weight: 600;
   color: #1a1a1a;
   letter-spacing: -0.01em;
@@ -381,7 +361,7 @@ onMounted(() => {
 
 .city-input {
   font-family: inherit;
-  font-size: 21px;
+  font-size: 24px;
   font-weight: 600;
   color: #111;
   background: transparent;
