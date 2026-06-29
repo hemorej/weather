@@ -323,7 +323,7 @@ onMounted(() => {
                 v-for="(h, i) in (weatherData?.hourly ?? [])"
                 :key="i"
                 class="hourly-row"
-                style="display:grid;grid-template-columns:34px 1fr 30px 34px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
+                style="display:grid;grid-template-columns:34px 1fr 34px 30px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
               >
                 <div :style="{ fontSize:'14px', fontWeight: i===0 ? 700 : 500, color: i===0 ? '#111' : '#8a8a8a', width:'34px' }">
                   {{ i === 0 ? h.label : `${h.label}h` }}
@@ -331,8 +331,8 @@ onMounted(() => {
                 <div style="display:flex;justify-content:center;color:#2a2a2a;">
                   <WeatherIcon :name="condIconName(h.conditionCode, h.isNight)" :size="22" />
                 </div>
-                <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ h.temp }}°</div>
                 <div style="text-align:right;font-size:11px;font-weight:600;color:#6aa0d4;">{{ h.precip > 0 ? `${h.precip}%` : '' }}</div>
+                <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ h.temp }}°</div>
               </div>
             </div>
           </section>
