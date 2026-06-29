@@ -47,7 +47,7 @@ const indicators = computed(() => {
     { key: 'wind',     icon: 'wind',     value: `${c.wind} km/h`,   label: 'Wind',      accent: false },
     { key: 'humidity', icon: 'humidity', value: `${c.humidity}%`,   label: 'Humidity',  accent: false },
     { key: 'aqi',      icon: 'leaf',     value: String(c.aqi),      label: c.aqiLabel,  accent: false },
-    { key: 'alert',    icon: 'alert',    value: c.alertText,        label: 'Alert',     accent: c.alertActive },
+    ...(c.alertActive ? [{ key: 'alert', icon: 'alert', value: c.alertText, label: 'Alert', accent: true }] : []),
   ]
 })
 

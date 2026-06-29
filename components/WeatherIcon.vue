@@ -38,13 +38,24 @@ withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 })
 
     <!-- partly cloudy day -->
     <template v-else-if="name === 'partly'">
-      <circle cx="8" cy="7.4" r="2.5" />
-      <!-- 5 rays for small sun -->
-      <line x1="12.0" y1="7.4"  x2="13.3" y2="7.4"  />
-      <line x1="10.8" y1="10.2" x2="11.8" y2="11.1" />
-      <line x1="8.0"  y1="11.4" x2="8.0"  y2="12.7" />
-      <line x1="5.2"  y1="10.2" x2="4.2"  y2="11.1" />
-      <line x1="4.0"  y1="7.4"  x2="2.7"  y2="7.4"  />
+      <defs>
+        <mask id="partly-sun-mask">
+          <rect width="24" height="24" fill="white"/>
+          <path d="M9 19.5a3.6 3.6 0 0 1-.4-7.18A4.85 4.85 0 0 1 18.1 13.2 3.4 3.4 0 0 1 17.5 19.5H9Z" fill="black" stroke="black" stroke-width="1.6" stroke-linejoin="round"/>
+        </mask>
+      </defs>
+      <g mask="url(#partly-sun-mask)">
+        <circle cx="8" cy="7.4" r="2.5" />
+        <!-- 8 rays around small sun -->
+        <line x1="12.0" y1="7.4"  x2="13.3" y2="7.4"  />
+        <line x1="10.8" y1="10.2" x2="11.8" y2="11.1" />
+        <line x1="8.0"  y1="11.4" x2="8.0"  y2="12.7" />
+        <line x1="5.2"  y1="10.2" x2="4.2"  y2="11.1" />
+        <line x1="4.0"  y1="7.4"  x2="2.7"  y2="7.4"  />
+        <line x1="5.2"  y1="4.6"  x2="4.2"  y2="3.7"  />
+        <line x1="8.0"  y1="3.4"  x2="8.0"  y2="2.1"  />
+        <line x1="10.8" y1="4.6"  x2="11.8" y2="3.7"  />
+      </g>
       <path d="M9 19.5a3.6 3.6 0 0 1-.4-7.18A4.85 4.85 0 0 1 18.1 13.2 3.4 3.4 0 0 1 17.5 19.5H9Z" />
     </template>
 
