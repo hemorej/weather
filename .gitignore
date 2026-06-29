@@ -1,0 +1,29 @@
+# Nuxt
+.nuxt/
+.output/
+.data/
+dist/
+
+# Env
+.env
+.env.local
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Local AI assistant settings
+.claude/
