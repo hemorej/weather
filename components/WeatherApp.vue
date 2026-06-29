@@ -195,14 +195,14 @@ onMounted(() => {
       <header style="flex-shrink:0;text-align:left;padding-top:clamp(34px,6.5vh,76px);">
 
         <!-- Temperature + date/city row -->
-        <div style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:flex-start;gap:22px;">
           <!-- Temperature -->
           <div style="font-size:clamp(94px,17vw,126px);font-weight:200;line-height:.84;letter-spacing:-0.045em;color:#0f0f0f;">
             {{ weatherData ? `${weatherData.current.temp}°` : '—' }}
           </div>
 
           <!-- Date + city -->
-          <div style="padding-top:clamp(4px,1vh,10px);">
+          <div style="padding-top:clamp(4px,1vh,10px);min-width:0;flex:1;">
             <div style="font-size:17px;font-weight:500;color:#9a9a9a;letter-spacing:.2px;margin-bottom:5px;">
               {{ dateStr }}
             </div>
@@ -293,10 +293,10 @@ onMounted(() => {
 
       <template v-else>
         <!-- ── FORECAST COLUMNS ─────────────────────────────────────────────── -->
-        <div style="flex-shrink:0;display:flex;justify-content:space-between;gap:60px;margin-top:clamp(40px,7vh,72px);">
+        <div class="forecast-row" style="flex-shrink:0;display:flex;justify-content:space-between;gap:60px;margin-top:clamp(40px,7vh,72px);">
 
           <!-- 7-Day column (left) -->
-          <section style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
+          <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
             <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;margin-bottom:12px;flex-shrink:0;">7-Day</div>
             <div class="nb" style="height:308px;overflow-y:auto;">
               <div
@@ -316,7 +316,7 @@ onMounted(() => {
           </section>
 
           <!-- Hourly column (right) -->
-          <section style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
+          <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
             <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;margin-bottom:12px;flex-shrink:0;">Hourly</div>
             <div ref="hourlyEl" class="nb" style="height:308px;overflow-y:auto;" @scroll="onHourlyScroll">
               <div
@@ -325,7 +325,7 @@ onMounted(() => {
                 style="display:grid;grid-template-columns:34px 1fr 30px 34px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
               >
                 <div :style="{ fontSize:'14px', fontWeight: i===0 ? 700 : 500, color: i===0 ? '#111' : '#8a8a8a', width:'34px' }">
-                  {{ h.label }}
+                  {{ i === 0 ? h.label : `${h.label}h` }}
                 </div>
                 <div style="display:flex;justify-content:center;color:#2a2a2a;">
                   <WeatherIcon :name="condIconName(h.conditionCode, h.isNight)" :size="22" />
@@ -369,7 +369,7 @@ onMounted(() => {
   border-bottom: 1.5px solid #d4d4d4;
   outline: none;
   padding: 0 0 2px;
-  width: 200px;
+  width: 100%;
   line-height: 1;
 }
 
@@ -426,4 +426,9 @@ onMounted(() => {
   cursor: pointer;
 }
 .retry-btn:hover { background: #f5f5f5; }
+
+@media (max-width: 480px) {
+  .forecast-row { gap: 16px !important; }
+  .forecast-col { width: auto !important; flex: 1; flex-shrink: 1 !important; min-width: 0; }
+}
 </style>
