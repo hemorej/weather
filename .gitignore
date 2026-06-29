@@ -3,6 +3,7 @@
 .output/
 .data/
 dist/
+public/fonts/
 
 # Env
 .env
