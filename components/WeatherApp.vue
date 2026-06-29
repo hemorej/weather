@@ -445,7 +445,5 @@ onMounted(() => {
   .forecast-col:first-child::after { right: -8px; } /* half of the 16px gap */
   .forecast-col:last-child  { width: auto !important; flex: 0 0 auto !important; }
   .hourly-row { grid-template-columns: 34px 1fr 34px 30px !important; }
-  .hourly-row > div:nth-child(3) { order: 4; }
-  .hourly-row > div:nth-child(4) { order: 3; }
 }
 </style>
