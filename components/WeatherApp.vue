@@ -293,7 +293,7 @@ onMounted(() => {
 
       <template v-else>
         <!-- ── FORECAST COLUMNS ─────────────────────────────────────────────── -->
-        <div class="forecast-row" style="flex-shrink:0;display:flex;justify-content:space-between;gap:60px;margin-top:clamp(40px,7vh,72px);">
+        <div class="forecast-row" style="flex-shrink:0;display:flex;justify-content:flex-start;gap:60px;margin-top:clamp(40px,7vh,72px);">
 
           <!-- 7-Day column (left) -->
           <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
@@ -428,9 +428,21 @@ onMounted(() => {
 }
 .retry-btn:hover { background: #f5f5f5; }
 
+.forecast-col:first-child { position: relative; }
+.forecast-col:first-child::after {
+  content: '';
+  position: absolute;
+  right: -30px; /* half of the 60px gap */
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e8e8e8;
+}
+
 @media (max-width: 480px) {
   .forecast-row { gap: 16px !important; }
   .forecast-col:first-child { width: auto !important; flex: 1 1 0 !important; min-width: 0; max-width: 50%; }
+  .forecast-col:first-child::after { right: -8px; } /* half of the 16px gap */
   .forecast-col:last-child  { width: auto !important; flex: 0 0 auto !important; }
   .hourly-row { grid-template-columns: 34px 1fr 34px 30px !important; }
   .hourly-row > div:nth-child(3) { order: 4; }
