@@ -293,7 +293,7 @@ onMounted(() => {
 
       <template v-else>
         <!-- ── FORECAST COLUMNS ─────────────────────────────────────────────── -->
-        <div style="flex-shrink:0;display:flex;gap:60px;margin-top:clamp(40px,7vh,72px);">
+        <div style="flex-shrink:0;display:flex;justify-content:space-between;gap:60px;margin-top:clamp(40px,7vh,72px);">
 
           <!-- 7-Day column (left) -->
           <section style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
