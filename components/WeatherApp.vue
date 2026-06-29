@@ -322,6 +322,7 @@ onMounted(() => {
               <div
                 v-for="(h, i) in (weatherData?.hourly ?? [])"
                 :key="i"
+                class="hourly-row"
                 style="display:grid;grid-template-columns:34px 1fr 30px 34px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
               >
                 <div :style="{ fontSize:'14px', fontWeight: i===0 ? 700 : 500, color: i===0 ? '#111' : '#8a8a8a', width:'34px' }">
@@ -429,6 +430,10 @@ onMounted(() => {
 
 @media (max-width: 480px) {
   .forecast-row { gap: 16px !important; }
-  .forecast-col { width: auto !important; flex: 1; flex-shrink: 1 !important; min-width: 0; }
+  .forecast-col:first-child { width: auto !important; flex: 1 1 0 !important; min-width: 0; max-width: 50%; }
+  .forecast-col:last-child  { width: auto !important; flex: 0 0 auto !important; }
+  .hourly-row { grid-template-columns: 34px 1fr 34px 30px !important; }
+  .hourly-row > div:nth-child(3) { order: 4; }
+  .hourly-row > div:nth-child(4) { order: 3; }
 }
 </style>
