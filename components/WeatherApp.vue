@@ -168,15 +168,22 @@ function onCityBlur() {
 }
 
 // ── Hourly filtered to selected day (or first 24 h when none selected) ────────
+const todayDailyIdx = computed(() => {
+  const now = new Date()
+  return weatherData.value?.daily.findIndex(d => {
+    const date = new Date(d.dt * 1000)
+    return date.getFullYear() === now.getFullYear() &&
+           date.getMonth()    === now.getMonth()    &&
+           date.getDate()     === now.getDate()
+  }) ?? -1
+})
+
 const displayedHourly = computed(() => {
-  if (selectedDayIdx.value === null) return weatherData.value?.hourly ?? []
+  if (selectedDayIdx.value === null || selectedDayIdx.value === todayDailyIdx.value) {
+    return weatherData.value?.hourly ?? []
+  }
   const dayDt = weatherData.value!.daily[selectedDayIdx.value]!.dt
   const dayDate = new Date(dayDt * 1000)
-  const now = new Date()
-  const isToday = dayDate.getFullYear() === now.getFullYear() &&
-                  dayDate.getMonth()    === now.getMonth()    &&
-                  dayDate.getDate()     === now.getDate()
-  if (isToday) return weatherData.value?.hourly ?? []
   return (weatherData.value?.forecast ?? []).filter(h => {
     const d = new Date(h.dt * 1000)
     return d.getFullYear() === dayDate.getFullYear() &&
@@ -186,7 +193,7 @@ const displayedHourly = computed(() => {
 })
 
 const hourlyLabel = computed(() => {
-  if (selectedDayIdx.value === null) return 'Hourly'
+  if (selectedDayIdx.value === null || selectedDayIdx.value === todayDailyIdx.value) return 'Hourly'
   return weatherData.value?.daily[selectedDayIdx.value]?.dayLabel ?? 'Hourly'
 })
 
@@ -339,7 +346,7 @@ onMounted(() => {
                 v-for="(d, i) in (weatherData?.daily ?? [])"
                 :key="i"
                 class="day-row"
-                :class="{ 'day-row--selected': selectedDayIdx === i }"
+                :class="{ 'day-row--selected': selectedDayIdx === i && i !== todayDailyIdx }"
                 style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:12px;height:44px;border-bottom:1px solid #f4f4f4;cursor:pointer;"
                 @click="selectDay(i)"
               >
@@ -474,7 +481,17 @@ onMounted(() => {
 
 .day-row { transition: background .15s ease; }
 .day-row:hover { background: rgba(0,0,0,0.03); }
-.day-row--selected { background: rgba(0,0,0,0.055) !important; }
+.day-row--selected { position: relative; }
+.day-row--selected::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: -30px;
+  height: 2px;
+  background: #1a1a1a;
+  z-index: 1;
+}
 
 .forecast-col:first-child { position: relative; }
 .forecast-col:first-child::after {
@@ -493,5 +510,6 @@ onMounted(() => {
   .forecast-col:first-child::after { right: -8px; } /* half of the 16px gap */
   .forecast-col:last-child  { width: auto !important; flex: 0 0 auto !important; }
   .hourly-row { grid-template-columns: 34px 1fr 34px 30px !important; }
+  .day-row--selected::after { right: -8px; }
 }
 </style>
