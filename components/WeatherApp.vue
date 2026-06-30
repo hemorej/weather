@@ -172,6 +172,11 @@ const displayedHourly = computed(() => {
   if (selectedDayIdx.value === null) return weatherData.value?.hourly ?? []
   const dayDt = weatherData.value!.daily[selectedDayIdx.value]!.dt
   const dayDate = new Date(dayDt * 1000)
+  const now = new Date()
+  const isToday = dayDate.getFullYear() === now.getFullYear() &&
+                  dayDate.getMonth()    === now.getMonth()    &&
+                  dayDate.getDate()     === now.getDate()
+  if (isToday) return weatherData.value?.hourly ?? []
   return (weatherData.value?.forecast ?? []).filter(h => {
     const d = new Date(h.dt * 1000)
     return d.getFullYear() === dayDate.getFullYear() &&
