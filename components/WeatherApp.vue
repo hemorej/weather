@@ -10,11 +10,12 @@ const DEFAULT_LOCATION: GeoLocation = {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-const location    = ref<GeoLocation>(DEFAULT_LOCATION)
-const weatherData = ref<WeatherData | null>(null)
-const loading     = ref(true)
-const error       = ref<string | null>(null)
-const bgColor     = ref('#ffffff')
+const location       = ref<GeoLocation>(DEFAULT_LOCATION)
+const weatherData    = ref<WeatherData | null>(null)
+const loading        = ref(true)
+const error          = ref<string | null>(null)
+const bgColor        = ref('#ffffff')
+const selectedDayIdx = ref<number | null>(null)
 
 const editingCity   = ref(false)
 const searchQuery   = ref('')
@@ -62,6 +63,7 @@ function condIconName(cond: string, isNight: boolean): string {
 async function loadWeather(loc: GeoLocation) {
   loading.value = true
   error.value = null
+  selectedDayIdx.value = null
 
   const cached = cache.get(loc.lat, loc.lon)
   if (cached) {
@@ -165,11 +167,40 @@ function onCityBlur() {
   }, 150)
 }
 
+// ── Hourly filtered to selected day (or first 24 h when none selected) ────────
+const displayedHourly = computed(() => {
+  if (selectedDayIdx.value === null) return weatherData.value?.hourly ?? []
+  const dayDt = weatherData.value!.daily[selectedDayIdx.value]!.dt
+  const dayDate = new Date(dayDt * 1000)
+  return (weatherData.value?.forecast ?? []).filter(h => {
+    const d = new Date(h.dt * 1000)
+    return d.getFullYear() === dayDate.getFullYear() &&
+           d.getMonth()    === dayDate.getMonth()    &&
+           d.getDate()     === dayDate.getDate()
+  })
+})
+
+const hourlyLabel = computed(() => {
+  if (selectedDayIdx.value === null) return 'Hourly'
+  return weatherData.value?.daily[selectedDayIdx.value]?.dayLabel ?? 'Hourly'
+})
+
+function selectDay(i: number) {
+  selectedDayIdx.value = selectedDayIdx.value === i ? null : i
+  nextTick(() => {
+    hourlyEl.value?.scrollTo({ top: 0 })
+    const first = displayedHourly.value[0]
+    bgColor.value = first
+      ? tintFor(first.temp)
+      : tintFor(weatherData.value?.current.temp ?? 20)
+  })
+}
+
 // ── Hourly scroll → background tint ──────────────────────────────────────────
 function onHourlyScroll() {
   const el = hourlyEl.value
   if (!el || !weatherData.value) return
-  const hrs = weatherData.value.hourly
+  const hrs = displayedHourly.value
   if (!hrs.length) return
   const rowH = 44
   const idx = Math.max(0, Math.min(hrs.length - 1, Math.round(el.scrollTop / rowH)))
@@ -302,9 +333,12 @@ onMounted(() => {
               <div
                 v-for="(d, i) in (weatherData?.daily ?? [])"
                 :key="i"
-                style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:12px;height:44px;border-bottom:1px solid #f4f4f4;"
+                class="day-row"
+                :class="{ 'day-row--selected': selectedDayIdx === i }"
+                style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:12px;height:44px;border-bottom:1px solid #f4f4f4;cursor:pointer;"
+                @click="selectDay(i)"
               >
-                <div style="font-size:14px;font-weight:500;color:#1a1a1a;width:34px;">{{ d.dayLabel }}</div>
+                <div :style="{ fontSize:'14px', fontWeight: selectedDayIdx === i ? 600 : 500, color:'#1a1a1a', width:'34px' }">{{ d.dayLabel }}</div>
                 <div style="display:flex;justify-content:center;color:#2a2a2a;">
                   <WeatherIcon :name="condIconName(d.conditionCode, false)" :size="22" />
                 </div>
@@ -317,22 +351,27 @@ onMounted(() => {
 
           <!-- Hourly column (right) -->
           <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
-            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;margin-bottom:12px;flex-shrink:0;">Hourly</div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;margin-bottom:12px;flex-shrink:0;">{{ hourlyLabel }}</div>
             <div ref="hourlyEl" class="nb" style="height:308px;overflow-y:auto;" @scroll="onHourlyScroll">
-              <div
-                v-for="(h, i) in (weatherData?.hourly ?? [])"
-                :key="i"
-                class="hourly-row"
-                style="display:grid;grid-template-columns:34px 1fr 34px 30px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
-              >
-                <div :style="{ fontSize:'14px', fontWeight: i===0 ? 700 : 500, color: i===0 ? '#111' : '#8a8a8a', width:'34px' }">
-                  {{ i === 0 ? h.label : `${h.label}h` }}
+              <template v-if="displayedHourly.length">
+                <div
+                  v-for="h in displayedHourly"
+                  :key="h.dt"
+                  class="hourly-row"
+                  style="display:grid;grid-template-columns:34px 1fr 34px 30px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
+                >
+                  <div :style="{ fontSize:'14px', fontWeight: h.label === 'Now' ? 700 : 500, color: h.label === 'Now' ? '#111' : '#8a8a8a', width:'34px' }">
+                    {{ h.label === 'Now' ? 'Now' : `${h.label}h` }}
+                  </div>
+                  <div style="display:flex;justify-content:center;color:#2a2a2a;">
+                    <WeatherIcon :name="condIconName(h.conditionCode, h.isNight)" :size="22" />
+                  </div>
+                  <div style="text-align:right;font-size:11px;font-weight:600;color:#6aa0d4;">{{ h.precip > 0 ? `${h.precip}%` : '' }}</div>
+                  <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ h.temp }}°</div>
                 </div>
-                <div style="display:flex;justify-content:center;color:#2a2a2a;">
-                  <WeatherIcon :name="condIconName(h.conditionCode, h.isNight)" :size="22" />
-                </div>
-                <div style="text-align:right;font-size:11px;font-weight:600;color:#6aa0d4;">{{ h.precip > 0 ? `${h.precip}%` : '' }}</div>
-                <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ h.temp }}°</div>
+              </template>
+              <div v-else-if="weatherData" style="height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#c0c0c0;">
+                No hourly data
               </div>
             </div>
           </section>
@@ -427,6 +466,10 @@ onMounted(() => {
   cursor: pointer;
 }
 .retry-btn:hover { background: #f5f5f5; }
+
+.day-row { transition: background .15s ease; }
+.day-row:hover { background: rgba(0,0,0,0.03); }
+.day-row--selected { background: rgba(0,0,0,0.055) !important; }
 
 .forecast-col:first-child { position: relative; }
 .forecast-col:first-child::after {

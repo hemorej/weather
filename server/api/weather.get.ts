@@ -47,6 +47,18 @@ interface OWMAQIResponse {
   }>
 }
 
+interface OWMForecastResponse {
+  list: Array<{
+    dt: number
+    main: { temp: number }
+    weather?: OWMWeather[]
+    clouds?: { all: number }
+    pop: number
+    sys?: { pod: string }
+  }>
+  city: { sunrise: number; sunset: number }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -125,11 +137,12 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
   const base = `lat=${lat}&lon=${lon}&units=metric&appid=${key}`
 
   try {
-    const [currentRes, hourlyRes, dailyRes, aqiRes] = await Promise.all([
+    const [currentRes, hourlyRes, dailyRes, aqiRes, forecastRes] = await Promise.all([
       $fetch<{ data: OWMCurrentData[] }>(`${OWM}/data/4.0/onecall/current?${base}`),
       $fetch<{ data: OWMHourlyData[] }>(`${OWM}/data/4.0/onecall/timeline/1h?${base}&cnt=24`),
       $fetch<{ data: OWMDailyData[] }>(`${OWM}/data/4.0/onecall/timeline/1day?${base}&cnt=8`),
       $fetch<OWMAQIResponse>(`${OWM}/data/2.5/air_pollution?${base}`),
+      $fetch<OWMForecastResponse>(`${OWM}/data/2.5/forecast?${base}`),
     ])
 
     const cur = currentRes.data[0]!
@@ -185,12 +198,13 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
       alertText,
     }
 
-    const hourly = hourlyRes.data.slice(0, 24).map((h, i) => {
+    const hourly = hourlyRes.data.map((h, i) => {
       const hourNum = new Date(h.dt * 1000).getHours()
       const { cond, isNight } = h.weather?.[0]?.icon
         ? conditionFromIcon(h.weather[0].icon)
         : conditionFromClouds(h.clouds ?? 0, h.dt, cur.sunrise, cur.sunset)
       return {
+        dt: h.dt,
         label: i === 0 ? 'Now' : String(hourNum).padStart(2, '0'),
         isNight,
         temp: Math.round(h.temp),
@@ -205,6 +219,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
         ? conditionFromIcon(d.weather[0].icon)
         : conditionFromClouds(d.clouds ?? 0, d.dt, cur.sunrise, cur.sunset)
       return {
+        dt: d.dt,
         dayLabel: dayNames[new Date(d.dt * 1000).getDay()]!,
         conditionCode: cond,
         precip: Math.round(d.pop * 100),
@@ -213,7 +228,22 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
       }
     })
 
-    return { current, hourly, daily }
+    const forecast = forecastRes.list.map(item => {
+      const hourNum = new Date(item.dt * 1000).getHours()
+      const { cond, isNight } = item.weather?.[0]?.icon
+        ? conditionFromIcon(item.weather[0].icon)
+        : conditionFromClouds(item.clouds?.all ?? 0, item.dt, forecastRes.city.sunrise, forecastRes.city.sunset)
+      return {
+        dt: item.dt,
+        label: String(hourNum).padStart(2, '0'),
+        isNight,
+        temp: Math.round(item.main.temp),
+        conditionCode: cond,
+        precip: Math.round(item.pop * 100),
+      }
+    })
+
+    return { current, hourly, forecast, daily }
   } catch (err: unknown) {
     const e = err as Record<string, any>
     // ofetch exposes status both as err.status (shortcut) and err.response.status

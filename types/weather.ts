@@ -21,6 +21,7 @@ export interface WeatherCurrent {
 }
 
 export interface WeatherHourly {
+  dt: number         // unix timestamp (seconds UTC)
   label: string      // 'Now' | '14' | '09'
   isNight: boolean
   temp: number
@@ -29,6 +30,7 @@ export interface WeatherHourly {
 }
 
 export interface WeatherDaily {
+  dt: number         // unix timestamp (seconds UTC)
   dayLabel: string   // 'Today' | 'Mon' | 'Tue' | …
   conditionCode: string
   precip: number
@@ -38,7 +40,8 @@ export interface WeatherDaily {
 
 export interface WeatherData {
   current: WeatherCurrent
-  hourly: WeatherHourly[]
+  hourly: WeatherHourly[]   // 1-hour intervals, next 24 h (One Call 4.0)
+  forecast: WeatherHourly[] // 3-hour intervals, next 5 days (Forecast 5 API)
   daily: WeatherDaily[]
 }
 
