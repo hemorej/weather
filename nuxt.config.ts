@@ -27,6 +27,20 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/global.css'],
 
+  nitro: {
+    compressPublicAssets: true,
+    routeRules: {
+      '/_nuxt/**': { headers: { 'cache-control': 'public, max-age=31536000, immutable' } },
+      '/fonts/**': { headers: { 'cache-control': 'public, max-age=31536000, immutable' } },
+    },
+  },
+
+  vite: {
+    build: {
+      cssMinify: true,
+    },
+  },
+
   experimental: {
     appManifest: false,
   },
