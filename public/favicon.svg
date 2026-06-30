@@ -1,16 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  
-  <g fill="#9CC4E8">
-    <circle cx="44" cy="20" r="12"></circle>
-    <g stroke="#9CC4E8" stroke-width="4" stroke-linecap="round">
-      <line x1="44" y1="1.5" x2="44" y2="6"></line>
-      <line x1="59.4" y1="4.6" x2="56.2" y2="7.8"></line>
-      <line x1="62.5" y1="20" x2="58" y2="20"></line>
-      <line x1="59.4" y1="35.4" x2="56.2" y2="32.2"></line>
-      <line x1="28.6" y1="4.6" x2="31.8" y2="7.8"></line>
-      <line x1="25.5" y1="20" x2="30" y2="20"></line>
-    </g>
-  </g>
-  
-  <path d="M20 56&#xA;           a11.5 11.5 0 0 1 0.6 -22.9&#xA;           a14.5 14.5 0 0 1 27.4 4&#xA;           a9.6 9.6 0 0 1 -1.9 18.9&#xA;           Z" fill="#5C93C7"></path>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 128 128"><g id="clear-day__clear-day"><g id="clear-day__Sun"><circle id="clear-day__Core" cx="64" cy="64" r="20" fill="#f8af18"/><g id="clear-day__Rays"><path fill="#f8af18" d="M61 19a3 3 0 1 1 6 0v14a3 3 0 0 1-6 0zM93.699 30.059A3 3 0 1 1 97.94 34.3l-9.9 9.9a3 3 0 1 1-4.242-4.243zM109 61a3 3 0 1 1 0 6H95a3 3 0 1 1 0-6zM97.941 93.699a3 3 0 1 1-4.243 4.242l-9.899-9.9a3 3 0 1 1 4.243-4.242zM61 95a3 3 0 1 1 6 0v14a3 3 0 1 1-6 0zM39.958 83.799a3 3 0 1 1 4.243 4.243l-9.9 9.9a3 3 0 1 1-4.242-4.243zM33 61a3 3 0 1 1 0 6H19a3 3 0 0 1 0-6zM44.201 39.958a3 3 0 1 1-4.243 4.243l-9.9-9.9a3 3 0 1 1 4.243-4.242z"/></g></g></g></svg>
