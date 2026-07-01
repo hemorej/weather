@@ -22,7 +22,7 @@ watch(loading, (isLoading) => {
     showLoading.value = true
     shownAt = Date.now()
   } else {
-    const remain = Math.max(0, 400 - (Date.now() - shownAt))
+    const remain = Math.max(0, 200 - (Date.now() - shownAt))
     setTimeout(() => { showLoading.value = false }, remain)
   }
 }, { immediate: true })
@@ -244,7 +244,7 @@ onMounted(() => {
     :style="{ backgroundColor: bgColor, transition: 'background-color .55s ease' }"
     style="height:100vh;display:flex;justify-content:center;color:#111;font-family:'Hanken Grotesk',system-ui,-apple-system,sans-serif;overflow:hidden;"
   >
-    <div style="position:relative;width:100%;max-width:540px;height:100%;display:flex;flex-direction:column;padding:0 30px;" :aria-busy="showLoading">
+    <div style="width:100%;max-width:540px;height:100%;display:flex;flex-direction:column;padding:0 30px;" :aria-busy="showLoading">
 
       <!-- ── HEADER ─────────────────────────────────────────────────────────── -->
       <header style="flex-shrink:0;text-align:left;padding-top:clamp(34px,6.5vh,76px);">
@@ -391,42 +391,44 @@ onMounted(() => {
         </div>
       </template>
 
-      <!-- ── LOADING OVERLAY ──────────────────────────────────────────────── -->
-      <Transition name="load-fade">
-        <div v-if="showLoading && !error" class="load-overlay" aria-hidden="true">
-          <!-- Header skeleton -->
-          <div style="flex-shrink:0;padding-top:clamp(34px,6.5vh,76px);">
-            <div style="display:flex;align-items:flex-start;gap:22px;">
-              <div class="sk sk--temp" />
-              <div style="padding-top:12px;display:flex;flex-direction:column;gap:10px;">
-                <div class="sk" style="width:118px;height:13px;border-radius:6px;" />
-                <div class="sk" style="width:148px;height:22px;border-radius:7px;animation-delay:.1s;" />
-              </div>
-            </div>
-            <!-- Indicators skeleton -->
-            <div style="display:flex;justify-content:space-between;margin-top:clamp(24px,4vh,42px);">
-              <div v-for="n in 5" :key="n" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;">
-                <div class="sk sk--circle" />
-                <div class="sk" style="width:42px;height:13px;border-radius:5px;animation-delay:.08s;" />
-                <div class="sk sk--light" style="width:28px;height:8px;border-radius:4px;animation-delay:.14s;" />
-              </div>
+
+    </div>
+  <!-- ── LOADING OVERLAY (full-viewport) ─────────────────────────────────── -->
+  <Transition name="load-fade">
+    <div v-if="showLoading && !error" class="load-overlay" aria-hidden="true">
+      <div class="load-overlay__inner">
+        <!-- Header skeleton -->
+        <div style="flex-shrink:0;padding-top:clamp(34px,6.5vh,76px);">
+          <div style="display:flex;align-items:flex-start;gap:22px;">
+            <div class="sk sk--temp" />
+            <div style="padding-top:12px;display:flex;flex-direction:column;gap:10px;">
+              <div class="sk" style="width:118px;height:13px;border-radius:6px;" />
+              <div class="sk" style="width:148px;height:22px;border-radius:7px;animation-delay:.1s;" />
             </div>
           </div>
-          <!-- Forecast skeleton -->
-          <div style="flex-shrink:0;display:flex;justify-content:space-between;gap:60px;margin-top:clamp(40px,7vh,72px);">
-            <div v-for="col in 2" :key="col" style="width:184px;flex-shrink:0;">
-              <div class="sk" style="width:56px;height:10px;border-radius:5px;margin-bottom:14px;" />
-              <div v-for="row in 7" :key="row" class="sk-row">
-                <div class="sk" style="width:30px;height:13px;border-radius:5px;" />
-                <div class="sk sk--circle sk--light" style="animation-delay:.1s;" />
-                <div class="sk" style="width:40px;height:13px;border-radius:5px;animation-delay:.05s;" />
-              </div>
+          <!-- Indicators skeleton -->
+          <div style="display:flex;justify-content:space-between;margin-top:clamp(24px,4vh,42px);">
+            <div v-for="n in 5" :key="n" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;">
+              <div class="sk sk--circle" />
+              <div class="sk" style="width:42px;height:13px;border-radius:5px;animation-delay:.08s;" />
+              <div class="sk sk--light" style="width:28px;height:8px;border-radius:4px;animation-delay:.14s;" />
             </div>
           </div>
         </div>
-      </Transition>
-
+        <!-- Forecast skeleton -->
+        <div style="flex-shrink:0;display:flex;justify-content:space-between;gap:60px;margin-top:clamp(40px,7vh,72px);">
+          <div v-for="col in 2" :key="col" style="width:184px;flex-shrink:0;">
+            <div class="sk" style="width:56px;height:10px;border-radius:5px;margin-bottom:14px;" />
+            <div v-for="row in 7" :key="row" class="sk-row">
+              <div class="sk" style="width:30px;height:13px;border-radius:5px;" />
+              <div class="sk sk--circle sk--light" style="animation-delay:.1s;" />
+              <div class="sk" style="width:40px;height:13px;border-radius:5px;animation-delay:.05s;" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+  </Transition>
   </div>
 </template>
 
@@ -549,14 +551,20 @@ onMounted(() => {
 }
 
 .load-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  padding: 0 30px;
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   overflow: hidden;
   background: hsl(212 44% 95%);
   animation: tintBreathe 4.5s ease-in-out infinite;
+}
+.load-overlay__inner {
+  width: 100%;
+  max-width: 540px;
+  padding: 0 30px;
+  display: flex;
+  flex-direction: column;
 }
 
 .load-fade-leave-active { transition: opacity .55s ease; }
