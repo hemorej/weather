@@ -15,7 +15,7 @@ A minimalist single-page weather app built with **Nuxt 3**, **Vue 3**, and **Typ
 
 ## Requirements
 
-- **Node.js 20+**
+- **Node.js 20+** and **pnpm 11+**
 - An [OpenWeatherMap](https://openweathermap.org/) account with an API key subscribed to **One Call API 4.0**
 
 > One Call API 4.0 is a **paid** subscription, separate from the free tier.
@@ -28,14 +28,14 @@ New API keys can take **up to 2 hours** to activate.
 
 ```bash
 # 1. Install dependencies
-npm install
+pnpm install
 
 # 2. Create your local env file
 cp .env.template .env
 # Edit .env and set OPENWEATHER_API_KEY=<your key>
 
 # 3. Start the dev server
-npm run dev
+pnpm dev
 # → http://localhost:3000
 ```
 
@@ -44,7 +44,7 @@ npm run dev
 ### Build
 
 ```bash
-npm run build
+pnpm build
 ```
 
 The output is a Node.js server in `.output/`.
@@ -76,7 +76,7 @@ The server listens on port **3000** by default. Set `PORT` to override.
 ### Deploy to Vercel (zero-config)
 
 ```bash
-npm i -g vercel
+pnpm add -g vercel
 vercel
 # Set OPENWEATHER_API_KEY in the Vercel dashboard → Settings → Environment Variables
 ```
@@ -97,7 +97,7 @@ CMD ["node", ".output/server/index.mjs"]
 ```
 weather-app/
 ├── server/api/
-│   ├── weather.get.ts      # Aggregates 4 OWM endpoints; shapes response into WeatherData
+│   ├── weather.get.ts      # Aggregates 5 OWM endpoints; shapes response into WeatherData
 │   └── geocoding.get.ts    # Proxies OWM Geocoding API; returns up to 5 GeoLocation results
 ├── composables/
 │   ├── useWeather.ts       # localStorage cache (10-min TTL) + location persistence
@@ -109,7 +109,8 @@ weather-app/
 ├── types/weather.ts        # Shared TypeScript interfaces
 ├── assets/css/global.css   # Resets and scrollbar hiding
 ├── app.vue                 # Root — wraps WeatherApp in <ClientOnly>
-└── nuxt.config.ts
+├── nuxt.config.ts
+└── pnpm-workspace.yaml     # pnpm 11 build script allowlist
 ```
 
 ## API endpoints used

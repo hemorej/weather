@@ -2,11 +2,11 @@ $CREATE_RELEASE()
 
 cd $FORGE_RELEASE_DIRECTORY
 
-npm install
+/home/forge/.local/share/pnpm/bin/pnpm install
 
 ln -s /mnt/volume-tor1-01/weatherfonts public/fonts
 
-npm run build
+/home/forge/.local/share/pnpm/bin/pnpm build
 
 $ACTIVATE_RELEASE()
 
