@@ -89,7 +89,8 @@ function conditionFromClouds(clouds: number, dt: number, sunrise: number, sunset
 }
 
 function windDir(deg: number): string {
-  return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8]!
+  const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']
+  return dirs[Math.round(deg / 22.5) % 16]!
 }
 
 /**

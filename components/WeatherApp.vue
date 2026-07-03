@@ -56,8 +56,8 @@ const indicators = computed(() => {
   if (!weatherData.value) return []
   const c = weatherData.value.current
   return [
-    { key: 'rain',     icon: 'droplet',  value: `${c.rain}%`,      label: 'Rain',      accent: false },
-    { key: 'wind',     icon: 'wind',     value: `${c.wind} km/h`,   label: 'Wind',      accent: false },
+    { key: 'rain',     icon: 'rain',     value: `${c.rain}%`,      label: 'Rain',      accent: false },
+    { key: 'wind',     icon: 'wind',     value: `${c.wind} km/h`,  label: `Wind · ${c.windDir}`, accent: false },
     { key: 'humidity', icon: 'humidity', value: `${c.humidity}%`,   label: 'Humidity',  accent: false },
     { key: 'aqi',      icon: 'leaf',     value: String(c.aqi),      label: c.aqiLabel,  accent: false },
     ...(c.alertActive ? [{ key: 'alert', icon: 'alert', value: c.alertText, label: 'Alert', accent: true }] : []),
