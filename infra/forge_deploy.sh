@@ -2,11 +2,11 @@ $CREATE_RELEASE()
 
 cd $FORGE_RELEASE_DIRECTORY
 
-/home/forge/.local/share/pnpm/bin/pnpm install
+$PNPM_PATH install --frozen-lockfile
 
 ln -s /mnt/volume-tor1-01/weatherfonts public/fonts
 
-/home/forge/.local/share/pnpm/bin/pnpm build
+$PNPM_PATH build
 
 $ACTIVATE_RELEASE()
 
