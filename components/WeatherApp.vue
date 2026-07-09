@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GeoLocation, WeatherData } from '~/types/weather'
+import type { GeoLocation, WeatherData, WeatherDaily } from '~/types/weather'
 import { useWeatherCache, useLocationStorage, fetchWeatherData } from '~/composables/useWeather'
 import { useGeocoding } from '~/composables/useGeocoding'
 import { useTemperatureColor } from '~/composables/useTemperatureColor'
@@ -69,6 +69,14 @@ function condIconName(cond: string, isNight: boolean): string {
   if (cond === 'clear') return isNight ? 'moon' : 'sun'
   if (cond === 'partly') return isNight ? 'partlyNight' : 'partly'
   return cond
+}
+
+// The daily conditionCode comes from OWM's own icon pick, which can disagree
+// with our derived rain probability (e.g. "cloudy" on a day that's 100%
+// likely to rain). Above the threshold, force the rain icon so they agree.
+function dailyIconName(d: WeatherDaily): string {
+  if (d.precip >= 50 && d.conditionCode !== 'storm') return 'rain'
+  return condIconName(d.conditionCode, false)
 }
 
 // ── Weather fetch (cache-first, 10-min TTL) ───────────────────────────────────
@@ -347,13 +355,14 @@ onMounted(() => {
                 :key="i"
                 class="day-row"
                 :class="{ 'day-row--selected': selectedDayIdx === i && i !== todayDailyIdx }"
-                style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:12px;height:44px;border-bottom:1px solid #f4f4f4;cursor:pointer;"
+                style="display:grid;grid-template-columns:34px 1fr 34px auto;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;cursor:pointer;"
                 @click="selectDay(i)"
               >
                 <div :style="{ fontSize:'14px', fontWeight: selectedDayIdx === i ? 600 : 500, color:'#1a1a1a', width:'34px' }">{{ d.dayLabel }}</div>
                 <div style="display:flex;justify-content:center;color:#2a2a2a;">
-                  <WeatherIcon :name="condIconName(d.conditionCode, false)" :size="22" />
+                  <WeatherIcon :name="dailyIconName(d)" :size="22" />
                 </div>
+                <div style="text-align:right;font-size:11px;font-weight:600;color:#6aa0d4;">{{ d.precip > 0 ? `${d.precip}%` : '' }}</div>
                 <div style="text-align:right;white-space:nowrap;font-size:14px;letter-spacing:.01em;">
                   <span style="font-weight:600;color:#141414;">{{ d.high }}°</span><span style="color:#d2d2d2;font-weight:400;margin:0 3px;">/</span><span style="font-weight:400;color:#b0b0b0;">{{ d.low }}°</span>
                 </div>
