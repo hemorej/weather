@@ -16,7 +16,7 @@
   "devDependencies": {
     "@nuxt/devtools": "latest",
     "@types/node": "^26.1.0",
-    "typescript": "^5.5.0",
+    "typescript": "^7.0.2",
     "vue-tsc": "^3.3.6"
   },
   "packageManager": "pnpm@11.9.0"
