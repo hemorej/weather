@@ -1,0 +1,45 @@
+name: CI
+
+# Frozen-lockfile install so CI can never silently re-resolve dependency
+# versions outside what's checked into pnpm-lock.yaml (and outside the
+# minimumReleaseAge window enforced in pnpm-workspace.yaml). Also runs
+# pnpm audit (known vulnerabilities) and audit signatures (npm registry
+# provenance) on every PR and push to main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.9.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24.x"
+          cache: pnpm
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Audit for known vulnerabilities
+        run: pnpm audit --audit-level=high
+
+      - name: Verify npm registry signatures
+        run: pnpm audit signatures
