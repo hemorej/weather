@@ -417,7 +417,7 @@ onMounted(() => {
     <!-- ── ALERT OVERLAY ────────────────────────────────────────────────────── -->
     <Transition name="alert-fade">
       <div
-        v-if="showAlert && weatherData?.current.alertDetail"
+        v-if="showAlert && weatherData?.current.alertDetails.length"
         class="alert-overlay"
         @click.self="showAlert = false"
       >
@@ -425,13 +425,24 @@ onMounted(() => {
           <button class="alert-close" aria-label="Close" @click="showAlert = false">✕</button>
           <div class="alert-card__header">
             <WeatherIcon name="alert" :size="20" style="color:#c2410c;" />
-            <span class="alert-card__title">{{ weatherData.current.alertDetail.event }}</span>
+            <span class="alert-card__title">
+              {{ weatherData.current.alertDetails.length > 1 ? `${weatherData.current.alertDetails.length} Active Alerts` : weatherData.current.alertDetails[0]!.event }}
+            </span>
           </div>
-          <div class="alert-card__meta">
-            {{ formatAlertTime(weatherData.current.alertDetail.start) }} – {{ formatAlertTime(weatherData.current.alertDetail.end) }}
+
+          <div
+            v-for="(alert, i) in weatherData.current.alertDetails"
+            :key="i"
+            class="alert-item"
+            :class="{ 'alert-item--divided': i > 0 }"
+          >
+            <div v-if="weatherData.current.alertDetails.length > 1" class="alert-item__title">{{ alert.event }}</div>
+            <div class="alert-card__meta">
+              {{ formatAlertTime(alert.start) }} – {{ formatAlertTime(alert.end) }}
+            </div>
+            <div class="alert-card__sender">{{ alert.senderName }}</div>
+            <div class="alert-card__desc">{{ alert.description }}</div>
           </div>
-          <div class="alert-card__sender">{{ weatherData.current.alertDetail.senderName }}</div>
-          <div class="alert-card__desc">{{ weatherData.current.alertDetail.description }}</div>
         </div>
       </div>
     </Transition>
@@ -629,6 +640,18 @@ onMounted(() => {
   line-height: 1.55;
   color: #333;
   white-space: pre-line;
+}
+
+.alert-item--divided {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #eee;
+}
+.alert-item__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-transform: capitalize;
 }
 
 .alert-fade-enter-active,

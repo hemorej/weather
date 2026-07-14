@@ -152,12 +152,13 @@ function aqiLabel(aqi: number): string {
 }
 
 /**
- * Some regional alert sources (e.g. Environment Canada) append CAP section
- * delimiters like a trailing "###" to the description text. Strip those
- * plus surrounding whitespace so the overlay only shows prose.
+ * Some regional alert sources (e.g. Environment Canada) use a "###" line to
+ * separate the actual hazard description from boilerplate reporting/
+ * monitoring instructions repeated on every alert. Drop everything from the
+ * first "###" onward so only the hazard-specific prose remains.
  */
 function cleanAlertDescription(text: string): string {
-  return text.replace(/#+\s*$/, '').trim()
+  return text.split(/^\s*#+\s*$/m)[0]!.trim()
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -208,19 +209,26 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     const pm25 = aqiRes.list[0]?.components?.pm2_5 ?? 0
     const aqi = pm25ToAqi(pm25)
 
-    // Fetch the first active alert to get a human-readable event name
+    // OWM's `alerts` field lists every concurrently active alert's UUID — a
+    // single location can have several (e.g. tornado + squall + thunderstorm
+    // watches at once), so all of them are fetched, not just the first.
     let alertActive = false
     let alertText = 'None'
-    let alertDetail: WeatherAlertDetail | null = null
+    const alertDetails: WeatherAlertDetail[] = []
     if (cur.alerts && cur.alerts.length > 0) {
-      try {
-        const alert = await $fetch<{
+      const results = await Promise.allSettled(
+        cur.alerts.map(id => $fetch<{
           sender_name: string
           event: string
           start: number
           end: number
           description?: Array<{ language: string; description: string }> | string
-        }>(`${OWM}/data/4.0/onecall/alert/${cur.alerts[0]}?appid=${key}`)
+        }>(`${OWM}/data/4.0/onecall/alert/${id}?appid=${key}`))
+      )
+
+      for (const result of results) {
+        if (result.status !== 'fulfilled') continue
+        const alert = result.value
 
         // Some regional alert sources (e.g. Environment Canada) leave `event` empty;
         // fall back to scanning the English description for type keywords.
@@ -229,22 +237,32 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
           : (typeof alert.description === 'string' ? alert.description : '')
         const searchText = (alert.event + ' ' + engDesc).toLowerCase()
 
-        alertActive = true
-        if (searchText.includes('heat') || searchText.includes('humidex')) alertText = 'Heat'
-        else if (searchText.includes('thunder') || searchText.includes('storm')) alertText = 'Storm'
-        else if (searchText.includes('wind') || searchText.includes('gale')) alertText = 'Wind'
-        else if (searchText.includes('flood')) alertText = 'Flood'
-        else if (searchText.includes('freeze') || searchText.includes('frost') || searchText.includes('snow')) alertText = 'Ice'
-        else alertText = alert.event.split(' ')[0] || 'Alert'
+        let label = 'Alert'
+        if (searchText.includes('tornado')) label = 'Tornado'
+        else if (searchText.includes('heat') || searchText.includes('humidex')) label = 'Heat'
+        else if (searchText.includes('thunder') || searchText.includes('storm')) label = 'Storm'
+        else if (searchText.includes('squall') || searchText.includes('wind') || searchText.includes('gale')) label = 'Wind'
+        else if (searchText.includes('flood')) label = 'Flood'
+        else if (searchText.includes('freeze') || searchText.includes('frost') || searchText.includes('snow')) label = 'Ice'
+        else label = alert.event.split(' ')[0] || 'Alert'
 
-        alertDetail = {
-          event: alert.event || alertText,
+        alertDetails.push({
+          event: alert.event || label,
           senderName: alert.sender_name || 'Unknown source',
           start: alert.start,
           end: alert.end,
           description: cleanAlertDescription(engDesc) || 'No further details available.',
+        })
+
+        // Indicator badge reflects the first successfully-resolved alert.
+        if (!alertActive) {
+          alertActive = true
+          alertText = label
         }
-      } catch {
+      }
+
+      // All lookups failed (e.g. transient OWM error) but alerts were reported active.
+      if (!alertActive) {
         alertActive = true
         alertText = 'Alert'
       }
@@ -262,7 +280,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
       aqiLabel: aqiLabel(aqi),
       alertActive,
       alertText,
-      alertDetail,
+      alertDetails,
     }
 
     const hourly = hourlyRes.data.map((h, i) => {

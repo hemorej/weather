@@ -18,7 +18,7 @@ export interface WeatherCurrent {
   aqiLabel: string   // 'Good' | 'Moderate' | 'Poor'
   alertActive: boolean
   alertText: string  // 'None' | 'Heat' | 'Storm' | etc.
-  alertDetail: WeatherAlertDetail | null
+  alertDetails: WeatherAlertDetail[]  // all concurrently active alerts, not just the first
 }
 
 export interface WeatherAlertDetail {
