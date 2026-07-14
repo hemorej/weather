@@ -14,8 +14,8 @@ export interface WeatherCurrent {
   wind: number       // km/h
   windDir: string
   humidity: number   // %
-  aqi: number
-  aqiLabel: string   // 'Good' | 'Moderate' | 'Poor'
+  aqi: number        // OWM's fixed 1-5 index (1 = Good … 5 = Very Poor)
+  aqiLabel: string   // 'Good' | 'Fair' | 'Moderate' | 'Poor' | 'Very Poor'
   alertActive: boolean
   alertText: string  // 'None' | 'Heat' | 'Storm' | etc.
   alertDetails: WeatherAlertDetail[]  // all concurrently active alerts, not just the first

@@ -43,7 +43,6 @@ interface OWMDailyData {
 interface OWMAQIResponse {
   list: Array<{
     main: { aqi: number }
-    components: { pm2_5: number }
   }>
 }
 
@@ -134,21 +133,19 @@ function deriveDailyPop(items: Array<{ dt: number; pop: number }>, offsetSeconds
 }
 
 /**
- * Converts a PM2.5 concentration (μg/m³) to approximate US AQI
- * using the EPA's standard linear interpolation breakpoints.
- * OWM returns AQI on a 1–5 scale; this gives a more informative 0–200+ value.
+ * OWM's Air Pollution API reports `main.aqi` on a fixed 1–5 scale
+ * (Good, Fair, Moderate, Poor, Very Poor) rather than the pollutant
+ * concentration itself.
  */
-function pm25ToAqi(pm25: number): number {
-  if (pm25 <= 12.0) return Math.round((pm25 / 12.0) * 50)
-  if (pm25 <= 35.4) return Math.round(51 + ((pm25 - 12.1) / 23.3) * 49)
-  if (pm25 <= 55.4) return Math.round(101 + ((pm25 - 35.5) / 19.9) * 49)
-  return Math.min(200, Math.round(151 + ((pm25 - 55.5) / 94.9) * 49))
-}
-
 function aqiLabel(aqi: number): string {
-  if (aqi <= 50) return 'Good'
-  if (aqi <= 100) return 'Moderate'
-  return 'Poor'
+  const labels: Record<number, string> = {
+    1: 'Good',
+    2: 'Fair',
+    3: 'Moderate',
+    4: 'Poor',
+    5: 'Very Poor',
+  }
+  return labels[aqi] ?? 'Unknown'
 }
 
 /**
@@ -206,8 +203,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     // First hourly entry's pop is the best proxy for current-hour rain probability
     const rainPercent = Math.round((hourlyRes.data[0]?.pop ?? 0) * 100)
 
-    const pm25 = aqiRes.list[0]?.components?.pm2_5 ?? 0
-    const aqi = pm25ToAqi(pm25)
+    const aqi = aqiRes.list[0]?.main?.aqi ?? 1
 
     // OWM's `alerts` field lists every concurrently active alert's UUID — a
     // single location can have several (e.g. tornado + squall + thunderstorm
