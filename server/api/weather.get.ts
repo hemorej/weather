@@ -1,4 +1,4 @@
-import type { WeatherData } from '~/types/weather'
+import type { WeatherData, WeatherAlertDetail } from '~/types/weather'
 
 const OWM = 'https://api.openweathermap.org'
 
@@ -24,6 +24,7 @@ interface OWMCurrentData {
 interface OWMHourlyData {
   dt: number
   temp: number
+  feels_like: number
   humidity: number
   wind_speed: number
   wind_deg: number
@@ -35,6 +36,9 @@ interface OWMHourlyData {
 interface OWMDailyData {
   dt: number
   temp: { day: number; min: number; max: number; night: number; morn: number; eve: number }
+  // OWM has no min/max equivalent for feels_like — day/night stand in as the
+  // closest approximation of a daily high/low when toggled.
+  feels_like: { day: number; night: number; eve: number; morn: number }
   pop: number | null  // OWM currently returns null here; see deriveDailyPop
   clouds?: number
   weather?: OWMWeather[]
@@ -43,14 +47,21 @@ interface OWMDailyData {
 interface OWMAQIResponse {
   list: Array<{
     main: { aqi: number }
-    components: { pm2_5: number }
+  }>
+}
+
+interface OWMAQIForecastResponse {
+  list: Array<{
+    dt: number
+    main: { aqi: number }
   }>
 }
 
 interface OWMForecastResponse {
   list: Array<{
     dt: number
-    main: { temp: number }
+    main: { temp: number; feels_like: number; humidity: number }
+    wind: { speed: number; deg: number }
     weather?: OWMWeather[]
     clouds?: { all: number }
     pop: number
@@ -94,6 +105,16 @@ function windDir(deg: number): string {
 }
 
 /**
+ * Coarser 8-point compass, lowercased, for the compact hourly-column suffix
+ * (e.g. "24kph.w") — the 16-point windDir() is too fine-grained to read at
+ * that size.
+ */
+function windDirShort(deg: number): string {
+  const dirs = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']
+  return dirs[Math.round(deg / 45) % 8]!
+}
+
+/**
  * Hour/day/date-key readers below all take an explicit UTC offset (seconds,
  * from OWM's timezone_offset / city.timezone) rather than using the host's
  * local timezone. `new Date(dt * 1000).getHours()` reads the *server's* TZ,
@@ -134,21 +155,44 @@ function deriveDailyPop(items: Array<{ dt: number; pop: number }>, offsetSeconds
 }
 
 /**
- * Converts a PM2.5 concentration (μg/m³) to approximate US AQI
- * using the EPA's standard linear interpolation breakpoints.
- * OWM returns AQI on a 1–5 scale; this gives a more informative 0–200+ value.
+ * OWM's Air Pollution API reports `main.aqi` on a fixed 1–5 scale
+ * (Good, Fair, Moderate, Poor, Very Poor) rather than the pollutant
+ * concentration itself.
  */
-function pm25ToAqi(pm25: number): number {
-  if (pm25 <= 12.0) return Math.round((pm25 / 12.0) * 50)
-  if (pm25 <= 35.4) return Math.round(51 + ((pm25 - 12.1) / 23.3) * 49)
-  if (pm25 <= 55.4) return Math.round(101 + ((pm25 - 35.5) / 19.9) * 49)
-  return Math.min(200, Math.round(151 + ((pm25 - 55.5) / 94.9) * 49))
+function aqiLabel(aqi: number): string {
+  const labels: Record<number, string> = {
+    1: 'Good',
+    2: 'Fair',
+    3: 'Moderate',
+    4: 'Poor',
+    5: 'Very Poor',
+  }
+  return labels[aqi] ?? 'Unknown'
 }
 
-function aqiLabel(aqi: number): string {
-  if (aqi <= 50) return 'Good'
-  if (aqi <= 100) return 'Moderate'
-  return 'Poor'
+/**
+ * Matches each weather-hour timestamp to the closest available air-pollution
+ * forecast reading (also hourly, but from a separate OWM endpoint/timeline
+ * so the two don't line up exactly minute-for-minute).
+ */
+function nearestAqi(dt: number, aqiList: Array<{ dt: number; main: { aqi: number } }>): number {
+  let best = aqiList[0]
+  let bestDiff = Infinity
+  for (const item of aqiList) {
+    const diff = Math.abs(item.dt - dt)
+    if (diff < bestDiff) { bestDiff = diff; best = item }
+  }
+  return best?.main.aqi ?? 1
+}
+
+/**
+ * Some regional alert sources (e.g. Environment Canada) use a "###" line to
+ * separate the actual hazard description from boilerplate reporting/
+ * monitoring instructions repeated on every alert. Drop everything from the
+ * first "###" onward so only the hazard-specific prose remains.
+ */
+function cleanAlertDescription(text: string): string {
+  return text.split(/^\s*#+\s*$/m)[0]!.trim()
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -178,11 +222,12 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
   const base = `lat=${lat}&lon=${lon}&units=metric&appid=${key}`
 
   try {
-    const [currentRes, hourlyRes, dailyRes, aqiRes, forecastRes] = await Promise.all([
+    const [currentRes, hourlyRes, dailyRes, aqiRes, aqiForecastRes, forecastRes] = await Promise.all([
       $fetch<{ data: OWMCurrentData[]; timezone_offset: number }>(`${OWM}/data/4.0/onecall/current?${base}`),
       $fetch<{ data: OWMHourlyData[]; timezone_offset: number }>(`${OWM}/data/4.0/onecall/timeline/1h?${base}&cnt=24`),
       $fetch<{ data: OWMDailyData[]; timezone_offset: number }>(`${OWM}/data/4.0/onecall/timeline/1day?${base}&cnt=8`),
       $fetch<OWMAQIResponse>(`${OWM}/data/2.5/air_pollution?${base}`),
+      $fetch<OWMAQIForecastResponse>(`${OWM}/data/2.5/air_pollution/forecast?${base}`),
       $fetch<OWMForecastResponse>(`${OWM}/data/2.5/forecast?${base}`),
     ])
 
@@ -196,18 +241,28 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     // First hourly entry's pop is the best proxy for current-hour rain probability
     const rainPercent = Math.round((hourlyRes.data[0]?.pop ?? 0) * 100)
 
-    const pm25 = aqiRes.list[0]?.components?.pm2_5 ?? 0
-    const aqi = pm25ToAqi(pm25)
+    const aqi = aqiRes.list[0]?.main?.aqi ?? 1
 
-    // Fetch the first active alert to get a human-readable event name
+    // OWM's `alerts` field lists every concurrently active alert's UUID — a
+    // single location can have several (e.g. tornado + squall + thunderstorm
+    // watches at once), so all of them are fetched, not just the first.
     let alertActive = false
     let alertText = 'None'
+    const alertDetails: WeatherAlertDetail[] = []
     if (cur.alerts && cur.alerts.length > 0) {
-      try {
-        const alert = await $fetch<{
+      const results = await Promise.allSettled(
+        cur.alerts.map(id => $fetch<{
+          sender_name: string
           event: string
+          start: number
+          end: number
           description?: Array<{ language: string; description: string }> | string
-        }>(`${OWM}/data/4.0/onecall/alert/${cur.alerts[0]}?appid=${key}`)
+        }>(`${OWM}/data/4.0/onecall/alert/${id}?appid=${key}`))
+      )
+
+      for (const result of results) {
+        if (result.status !== 'fulfilled') continue
+        const alert = result.value
 
         // Some regional alert sources (e.g. Environment Canada) leave `event` empty;
         // fall back to scanning the English description for type keywords.
@@ -216,14 +271,32 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
           : (typeof alert.description === 'string' ? alert.description : '')
         const searchText = (alert.event + ' ' + engDesc).toLowerCase()
 
-        alertActive = true
-        if (searchText.includes('heat') || searchText.includes('humidex')) alertText = 'Heat'
-        else if (searchText.includes('thunder') || searchText.includes('storm')) alertText = 'Storm'
-        else if (searchText.includes('wind') || searchText.includes('gale')) alertText = 'Wind'
-        else if (searchText.includes('flood')) alertText = 'Flood'
-        else if (searchText.includes('freeze') || searchText.includes('frost') || searchText.includes('snow')) alertText = 'Ice'
-        else alertText = alert.event.split(' ')[0] || 'Alert'
-      } catch {
+        let label = 'Alert'
+        if (searchText.includes('tornado')) label = 'Tornado'
+        else if (searchText.includes('heat') || searchText.includes('humidex')) label = 'Heat'
+        else if (searchText.includes('thunder') || searchText.includes('storm')) label = 'Storm'
+        else if (searchText.includes('squall') || searchText.includes('wind') || searchText.includes('gale')) label = 'Wind'
+        else if (searchText.includes('flood')) label = 'Flood'
+        else if (searchText.includes('freeze') || searchText.includes('frost') || searchText.includes('snow')) label = 'Ice'
+        else label = alert.event.split(' ')[0] || 'Alert'
+
+        alertDetails.push({
+          event: alert.event || label,
+          senderName: alert.sender_name || 'Unknown source',
+          start: alert.start,
+          end: alert.end,
+          description: cleanAlertDescription(engDesc) || 'No further details available.',
+        })
+
+        // Indicator badge reflects the first successfully-resolved alert.
+        if (!alertActive) {
+          alertActive = true
+          alertText = label
+        }
+      }
+
+      // All lookups failed (e.g. transient OWM error) but alerts were reported active.
+      if (!alertActive) {
         alertActive = true
         alertText = 'Alert'
       }
@@ -231,6 +304,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
 
     const current = {
       temp: Math.round(cur.temp),
+      feelsLike: Math.round(cur.feels_like),
       conditionCode: curCond,
       isNight: curIsNight,
       rain: rainPercent,
@@ -241,6 +315,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
       aqiLabel: aqiLabel(aqi),
       alertActive,
       alertText,
+      alertDetails,
     }
 
     const hourly = hourlyRes.data.map((h, i) => {
@@ -253,8 +328,13 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
         label: i === 0 ? 'Now' : String(hourNum).padStart(2, '0'),
         isNight,
         temp: Math.round(h.temp),
+        feelsLike: Math.round(h.feels_like),
         conditionCode: cond,
         precip: Math.round(h.pop * 100),
+        wind: Math.round(h.wind_speed * 3.6), // m/s → km/h
+        windDir: windDirShort(h.wind_deg),
+        humidity: h.humidity,
+        aqi: nearestAqi(h.dt, aqiForecastRes.list),
       }
     })
 
@@ -275,6 +355,8 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
         precip: derived ?? Math.round((d.pop ?? 0) * 100),
         low: Math.round(d.temp.min),
         high: Math.round(d.temp.max),
+        feelsLikeLow: Math.round(d.feels_like.night),
+        feelsLikeHigh: Math.round(d.feels_like.day),
       }
     })
 
@@ -288,8 +370,13 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
         label: String(hourNum).padStart(2, '0'),
         isNight,
         temp: Math.round(item.main.temp),
+        feelsLike: Math.round(item.main.feels_like),
         conditionCode: cond,
         precip: Math.round(item.pop * 100),
+        wind: Math.round(item.wind.speed * 3.6), // m/s → km/h
+        windDir: windDirShort(item.wind.deg),
+        humidity: item.main.humidity,
+        aqi: nearestAqi(item.dt, aqiForecastRes.list),
       }
     })
 

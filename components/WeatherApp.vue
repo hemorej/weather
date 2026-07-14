@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GeoLocation, WeatherData, WeatherDaily } from '~/types/weather'
+import type { GeoLocation, WeatherData, WeatherDaily, WeatherHourly } from '~/types/weather'
 import { useWeatherCache, useLocationStorage, fetchWeatherData } from '~/composables/useWeather'
 import { useGeocoding } from '~/composables/useGeocoding'
 import { useTemperatureColor } from '~/composables/useTemperatureColor'
@@ -32,6 +32,9 @@ const selectedDayIdx = ref<number | null>(null)
 const editingCity   = ref(false)
 const searchQuery   = ref('')
 const searchResults = ref<GeoLocation[]>([])
+const showAlert     = ref(false)
+const selectedMetric = ref<'rain' | 'wind' | 'humidity' | 'aqi'>('rain')
+const feelsLikeMode  = ref(false)
 
 // ── Template refs ─────────────────────────────────────────────────────────────
 const cityInputEl = ref<HTMLInputElement | null>(null)
@@ -65,6 +68,58 @@ const indicators = computed(() => {
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function formatAlertTime(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toLocaleString(undefined, {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  })
+}
+
+// AQI 1–5 (Good → Very Poor) mapped to a green→red hue.
+function aqiColor(aqi: number): string {
+  const colors: Record<number, string> = {
+    1: '#4a9f5e', 2: '#8fae3f', 3: '#d4a017', 4: '#d4711f', 5: '#c2410c',
+  }
+  return colors[aqi] ?? '#777'
+}
+
+// Toggling the same metric again reverts the hourly column to its rain default.
+function selectMetric(key: string) {
+  if (!['rain', 'wind', 'humidity', 'aqi'].includes(key)) return
+  selectedMetric.value = selectedMetric.value === key ? 'rain' : (key as typeof selectedMetric.value)
+}
+
+// Unit context shown once in the column header rather than repeated on every
+// row, so per-row wind values can stay a plain "25 sw" instead of "25kph.sw".
+// Humidity/AQI use their indicator icon instead of text (see metricUnitIcon).
+const metricUnitLabel = computed(() => selectedMetric.value === 'wind' ? 'km/h' : '')
+
+const metricUnitIcon = computed(() => {
+  switch (selectedMetric.value) {
+    case 'rain':     return 'rain'
+    case 'humidity': return 'humidity'
+    case 'aqi':      return 'leaf'
+    default:         return null
+  }
+})
+
+function hourlyMetricValue(h: WeatherHourly): string {
+  switch (selectedMetric.value) {
+    case 'wind':     return `${h.wind}`
+    case 'humidity': return `${h.humidity}%`
+    case 'aqi':      return String(h.aqi)
+    default:         return h.precip > 0 ? `${h.precip}%` : ''
+  }
+}
+
+// Rain and humidity are both plain percentages, so they get distinct hues
+// (blue vs. teal) to stay visually distinguishable even though only one is
+// ever shown at a time.
+function hourlyMetricColor(h: WeatherHourly): string {
+  if (selectedMetric.value === 'aqi') return aqiColor(h.aqi)
+  if (selectedMetric.value === 'humidity') return '#4ba69a'
+  return '#6aa0d4'
+}
+
 function condIconName(cond: string, isNight: boolean): string {
   if (cond === 'clear') return isNight ? 'moon' : 'sun'
   if (cond === 'partly') return isNight ? 'partlyNight' : 'partly'
@@ -84,6 +139,8 @@ async function loadWeather(loc: GeoLocation) {
   loading.value = true
   error.value = null
   selectedDayIdx.value = null
+  showAlert.value = false
+  selectedMetric.value = 'rain'
 
   const cached = cache.get(loc.lat, loc.lon)
   if (cached) {
@@ -258,14 +315,19 @@ onMounted(() => {
       <header style="flex-shrink:0;text-align:left;padding-top:clamp(34px,6.5vh,76px);">
 
         <!-- Temperature + date/city row -->
-        <div style="display:flex;align-items:flex-start;gap:22px;">
-          <!-- Temperature -->
-          <div style="font-size:clamp(94px,17vw,126px);font-weight:200;line-height:.84;letter-spacing:-0.045em;color:#0f0f0f;">
-            {{ weatherData ? `${weatherData.current.temp}°` : '—' }}
-          </div>
+        <div style="display:flex;align-items:stretch;gap:22px;">
+          <!-- Temperature (click to toggle actual vs. feels-like everywhere) -->
+          <button
+            class="temp-btn"
+            :disabled="!weatherData"
+            :title="feelsLikeMode ? 'Showing feels-like temperatures — click for actual' : 'Click to show feels-like temperatures'"
+            @click="feelsLikeMode = !feelsLikeMode"
+          >
+            {{ weatherData ? `${feelsLikeMode ? weatherData.current.feelsLike : weatherData.current.temp}°` : '—' }}
+          </button>
 
           <!-- Date + city -->
-          <div style="padding-top:clamp(4px,1vh,10px);min-width:0;flex:1;">
+          <div style="padding-top:clamp(4px,1vh,10px);min-width:0;flex:1;display:flex;flex-direction:column;">
             <div style="font-size:17px;font-weight:500;color:#9a9a9a;letter-spacing:.2px;margin-bottom:5px;">
               {{ dateStr }}
             </div>
@@ -309,6 +371,8 @@ onMounted(() => {
                 </div>
               </template>
             </div>
+
+            <div v-if="feelsLikeMode" class="feels-like-tag" style="margin-top:auto;">Feels like</div>
           </div>
         </div>
 
@@ -317,9 +381,12 @@ onMounted(() => {
           <div
             v-for="ind in indicators"
             :key="ind.key"
+            class="indicator"
+            :class="{ 'indicator--clickable': ind.key === 'alert' || ['rain','wind','humidity','aqi'].includes(ind.key) }"
             style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"
+            @click="ind.key === 'alert' ? (showAlert = true) : selectMetric(ind.key)"
           >
-            <WeatherIcon :name="ind.icon" :size="18" style="color:#777;" />
+            <WeatherIcon :name="ind.icon" :size="18" :style="{ color: ind.key === selectedMetric ? '#1a1a1a' : '#777' }" />
             <div :style="{ fontSize: '14px', fontWeight: 600, color: ind.accent ? '#c2410c' : '#1a1a1a', lineHeight: 1 }">
               {{ ind.value }}
             </div>
@@ -364,7 +431,7 @@ onMounted(() => {
                 </div>
                 <div style="text-align:right;font-size:11px;font-weight:600;color:#6aa0d4;">{{ d.precip > 0 ? `${d.precip}%` : '' }}</div>
                 <div style="text-align:right;white-space:nowrap;font-size:14px;letter-spacing:.01em;">
-                  <span style="font-weight:600;color:#141414;">{{ d.high }}°</span><span style="color:#d2d2d2;font-weight:400;margin:0 3px;">/</span><span style="font-weight:400;color:#b0b0b0;">{{ d.low }}°</span>
+                  <span style="font-weight:600;color:#141414;">{{ feelsLikeMode ? d.feelsLikeHigh : d.high }}°</span><span style="color:#d2d2d2;font-weight:400;margin:0 3px;">/</span><span style="font-weight:400;color:#b0b0b0;">{{ feelsLikeMode ? d.feelsLikeLow : d.low }}°</span>
                 </div>
               </div>
             </div>
@@ -372,14 +439,20 @@ onMounted(() => {
 
           <!-- Hourly column (right) -->
           <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
-            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;margin-bottom:12px;flex-shrink:0;">{{ hourlyLabel }}</div>
+            <div style="display:grid;grid-template-columns:34px 1fr 40px 30px;column-gap:8px;margin-bottom:12px;flex-shrink:0;">
+              <div style="grid-column:1 / 3;font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;">{{ hourlyLabel }}</div>
+              <div style="display:flex;justify-content:flex-end;">
+                <WeatherIcon v-if="metricUnitIcon" :name="metricUnitIcon" :size="12" style="color:#d4d4d4;" />
+                <span v-else style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#d4d4d4;white-space:nowrap;">{{ metricUnitLabel }}</span>
+              </div>
+            </div>
             <div ref="hourlyEl" class="nb" style="height:308px;overflow-y:auto;" @scroll="onHourlyScroll">
               <template v-if="displayedHourly.length">
                 <div
                   v-for="h in displayedHourly"
                   :key="h.dt"
                   class="hourly-row"
-                  style="display:grid;grid-template-columns:34px 1fr 34px 30px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
+                  style="display:grid;grid-template-columns:34px 1fr 40px 30px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
                 >
                   <div :style="{ fontSize:'14px', fontWeight: h.label === 'Now' ? 700 : 500, color: h.label === 'Now' ? '#111' : '#8a8a8a', width:'34px' }">
                     {{ h.label === 'Now' ? 'Now' : `${h.label}h` }}
@@ -387,8 +460,14 @@ onMounted(() => {
                   <div style="display:flex;justify-content:center;color:#2a2a2a;">
                     <WeatherIcon :name="condIconName(h.conditionCode, h.isNight)" :size="22" />
                   </div>
-                  <div style="text-align:right;font-size:11px;font-weight:600;color:#6aa0d4;">{{ h.precip > 0 ? `${h.precip}%` : '' }}</div>
-                  <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ h.temp }}°</div>
+                  <div style="text-align:right;font-size:11px;font-weight:600;white-space:nowrap;">
+                    <template v-if="selectedMetric === 'wind'">
+                      <span :style="{ color: hourlyMetricColor(h) }">{{ hourlyMetricValue(h) }}</span>
+                      <span style="color:#c2c2c2;font-weight:600;text-transform:uppercase;font-size:9px;margin-left:2px;">{{ h.windDir }}</span>
+                    </template>
+                    <span v-else :style="{ color: hourlyMetricColor(h) }">{{ hourlyMetricValue(h) }}</span>
+                  </div>
+                  <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ feelsLikeMode ? h.feelsLike : h.temp }}°</div>
                 </div>
               </template>
               <div v-else-if="weatherData" style="height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#c0c0c0;">
@@ -402,6 +481,40 @@ onMounted(() => {
 
 
     </div>
+
+    <!-- ── ALERT OVERLAY ────────────────────────────────────────────────────── -->
+    <Transition name="alert-fade">
+      <div
+        v-if="showAlert && weatherData?.current.alertDetails.length"
+        class="alert-overlay"
+        @click.self="showAlert = false"
+      >
+        <div class="alert-card">
+          <button class="alert-close" aria-label="Close" @click="showAlert = false">✕</button>
+          <div class="alert-card__header">
+            <WeatherIcon name="alert" :size="20" style="color:#c2410c;" />
+            <span class="alert-card__title">
+              {{ weatherData.current.alertDetails.length > 1 ? `${weatherData.current.alertDetails.length} Active Alerts` : weatherData.current.alertDetails[0]!.event }}
+            </span>
+          </div>
+
+          <div
+            v-for="(alert, i) in weatherData.current.alertDetails"
+            :key="i"
+            class="alert-item"
+            :class="{ 'alert-item--divided': i > 0 }"
+          >
+            <div v-if="weatherData.current.alertDetails.length > 1" class="alert-item__title">{{ alert.event }}</div>
+            <div class="alert-card__meta">
+              {{ formatAlertTime(alert.start) }} – {{ formatAlertTime(alert.end) }}
+            </div>
+            <div class="alert-card__sender">{{ alert.senderName }}</div>
+            <div class="alert-card__desc">{{ alert.description }}</div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
   <!-- ── LOADING OVERLAY (full-viewport) ─────────────────────────────────── -->
   <Transition name="load-fade">
     <div v-if="showLoading && !error" class="load-overlay" aria-hidden="true">
@@ -456,6 +569,29 @@ onMounted(() => {
   line-height: 1;
 }
 .city-btn:hover { color: #000; }
+
+.temp-btn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: clamp(94px, 17vw, 126px);
+  font-weight: 200;
+  line-height: .84;
+  letter-spacing: -0.045em;
+  color: #0f0f0f;
+  cursor: pointer;
+  padding: 0;
+  transition: color .15s ease;
+}
+.temp-btn:disabled { cursor: default; }
+
+.feels-like-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #6aa0d4;
+}
 
 .city-input {
   font-family: inherit;
@@ -525,6 +661,95 @@ onMounted(() => {
 }
 .retry-btn:hover { background: #f5f5f5; }
 
+.indicator--clickable { cursor: pointer; }
+
+.alert-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 15, 10, 0.35);
+}
+
+.alert-card {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px 22px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.22);
+}
+
+.alert-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: #f2f2f2;
+  color: #777;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.alert-close:hover { background: #e6e6e6; }
+
+.alert-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 28px;
+}
+.alert-card__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+.alert-card__meta {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c2410c;
+}
+.alert-card__sender {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #9a9a9a;
+}
+.alert-card__desc {
+  margin-top: 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #333;
+  white-space: pre-line;
+}
+
+.alert-item--divided {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #eee;
+}
+.alert-item__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-transform: capitalize;
+}
+
+.alert-fade-enter-active,
+.alert-fade-leave-active { transition: opacity .2s ease; }
+.alert-fade-enter-from,
+.alert-fade-leave-to { opacity: 0; }
+
 .day-row { transition: background .15s ease; }
 .day-row:hover { background: rgba(0,0,0,0.03); }
 .day-row--selected { position: relative; }
@@ -567,6 +792,7 @@ onMounted(() => {
   overflow: hidden;
   background: hsl(212 44% 95%);
   animation: tintBreathe 4.5s ease-in-out infinite;
+  pointer-events: none;
 }
 .load-overlay__inner {
   width: 100%;
