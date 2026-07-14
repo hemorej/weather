@@ -34,6 +34,7 @@ const searchQuery   = ref('')
 const searchResults = ref<GeoLocation[]>([])
 const showAlert     = ref(false)
 const selectedMetric = ref<'rain' | 'wind' | 'humidity' | 'aqi'>('rain')
+const feelsLikeMode  = ref(false)
 
 // ── Template refs ─────────────────────────────────────────────────────────────
 const cityInputEl = ref<HTMLInputElement | null>(null)
@@ -314,14 +315,19 @@ onMounted(() => {
       <header style="flex-shrink:0;text-align:left;padding-top:clamp(34px,6.5vh,76px);">
 
         <!-- Temperature + date/city row -->
-        <div style="display:flex;align-items:flex-start;gap:22px;">
-          <!-- Temperature -->
-          <div style="font-size:clamp(94px,17vw,126px);font-weight:200;line-height:.84;letter-spacing:-0.045em;color:#0f0f0f;">
-            {{ weatherData ? `${weatherData.current.temp}°` : '—' }}
-          </div>
+        <div style="display:flex;align-items:stretch;gap:22px;">
+          <!-- Temperature (click to toggle actual vs. feels-like everywhere) -->
+          <button
+            class="temp-btn"
+            :disabled="!weatherData"
+            :title="feelsLikeMode ? 'Showing feels-like temperatures — click for actual' : 'Click to show feels-like temperatures'"
+            @click="feelsLikeMode = !feelsLikeMode"
+          >
+            {{ weatherData ? `${feelsLikeMode ? weatherData.current.feelsLike : weatherData.current.temp}°` : '—' }}
+          </button>
 
           <!-- Date + city -->
-          <div style="padding-top:clamp(4px,1vh,10px);min-width:0;flex:1;">
+          <div style="padding-top:clamp(4px,1vh,10px);min-width:0;flex:1;display:flex;flex-direction:column;">
             <div style="font-size:17px;font-weight:500;color:#9a9a9a;letter-spacing:.2px;margin-bottom:5px;">
               {{ dateStr }}
             </div>
@@ -365,6 +371,8 @@ onMounted(() => {
                 </div>
               </template>
             </div>
+
+            <div v-if="feelsLikeMode" class="feels-like-tag" style="margin-top:auto;">Feels like</div>
           </div>
         </div>
 
@@ -423,7 +431,7 @@ onMounted(() => {
                 </div>
                 <div style="text-align:right;font-size:11px;font-weight:600;color:#6aa0d4;">{{ d.precip > 0 ? `${d.precip}%` : '' }}</div>
                 <div style="text-align:right;white-space:nowrap;font-size:14px;letter-spacing:.01em;">
-                  <span style="font-weight:600;color:#141414;">{{ d.high }}°</span><span style="color:#d2d2d2;font-weight:400;margin:0 3px;">/</span><span style="font-weight:400;color:#b0b0b0;">{{ d.low }}°</span>
+                  <span style="font-weight:600;color:#141414;">{{ feelsLikeMode ? d.feelsLikeHigh : d.high }}°</span><span style="color:#d2d2d2;font-weight:400;margin:0 3px;">/</span><span style="font-weight:400;color:#b0b0b0;">{{ feelsLikeMode ? d.feelsLikeLow : d.low }}°</span>
                 </div>
               </div>
             </div>
@@ -459,7 +467,7 @@ onMounted(() => {
                     </template>
                     <span v-else :style="{ color: hourlyMetricColor(h) }">{{ hourlyMetricValue(h) }}</span>
                   </div>
-                  <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ h.temp }}°</div>
+                  <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ feelsLikeMode ? h.feelsLike : h.temp }}°</div>
                 </div>
               </template>
               <div v-else-if="weatherData" style="height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#c0c0c0;">
@@ -561,6 +569,29 @@ onMounted(() => {
   line-height: 1;
 }
 .city-btn:hover { color: #000; }
+
+.temp-btn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: clamp(94px, 17vw, 126px);
+  font-weight: 200;
+  line-height: .84;
+  letter-spacing: -0.045em;
+  color: #0f0f0f;
+  cursor: pointer;
+  padding: 0;
+  transition: color .15s ease;
+}
+.temp-btn:disabled { cursor: default; }
+
+.feels-like-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #6aa0d4;
+}
 
 .city-input {
   font-family: inherit;

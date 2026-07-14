@@ -24,6 +24,7 @@ interface OWMCurrentData {
 interface OWMHourlyData {
   dt: number
   temp: number
+  feels_like: number
   humidity: number
   wind_speed: number
   wind_deg: number
@@ -35,6 +36,9 @@ interface OWMHourlyData {
 interface OWMDailyData {
   dt: number
   temp: { day: number; min: number; max: number; night: number; morn: number; eve: number }
+  // OWM has no min/max equivalent for feels_like — day/night stand in as the
+  // closest approximation of a daily high/low when toggled.
+  feels_like: { day: number; night: number; eve: number; morn: number }
   pop: number | null  // OWM currently returns null here; see deriveDailyPop
   clouds?: number
   weather?: OWMWeather[]
@@ -56,7 +60,7 @@ interface OWMAQIForecastResponse {
 interface OWMForecastResponse {
   list: Array<{
     dt: number
-    main: { temp: number; humidity: number }
+    main: { temp: number; feels_like: number; humidity: number }
     wind: { speed: number; deg: number }
     weather?: OWMWeather[]
     clouds?: { all: number }
@@ -300,6 +304,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
 
     const current = {
       temp: Math.round(cur.temp),
+      feelsLike: Math.round(cur.feels_like),
       conditionCode: curCond,
       isNight: curIsNight,
       rain: rainPercent,
@@ -323,6 +328,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
         label: i === 0 ? 'Now' : String(hourNum).padStart(2, '0'),
         isNight,
         temp: Math.round(h.temp),
+        feelsLike: Math.round(h.feels_like),
         conditionCode: cond,
         precip: Math.round(h.pop * 100),
         wind: Math.round(h.wind_speed * 3.6), // m/s → km/h
@@ -349,6 +355,8 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
         precip: derived ?? Math.round((d.pop ?? 0) * 100),
         low: Math.round(d.temp.min),
         high: Math.round(d.temp.max),
+        feelsLikeLow: Math.round(d.feels_like.night),
+        feelsLikeHigh: Math.round(d.feels_like.day),
       }
     })
 
@@ -362,6 +370,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
         label: String(hourNum).padStart(2, '0'),
         isNight,
         temp: Math.round(item.main.temp),
+        feelsLike: Math.round(item.main.feels_like),
         conditionCode: cond,
         precip: Math.round(item.pop * 100),
         wind: Math.round(item.wind.speed * 3.6), // m/s → km/h

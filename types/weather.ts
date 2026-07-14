@@ -8,6 +8,7 @@ export interface GeoLocation {
 
 export interface WeatherCurrent {
   temp: number
+  feelsLike: number
   conditionCode: string
   isNight: boolean
   rain: number       // precipitation probability %
@@ -34,6 +35,7 @@ export interface WeatherHourly {
   label: string      // 'Now' | '14' | '09'
   isNight: boolean
   temp: number
+  feelsLike: number
   conditionCode: string
   precip: number     // precipitation probability %
   wind: number       // km/h
@@ -49,6 +51,10 @@ export interface WeatherDaily {
   precip: number
   low: number
   high: number
+  // OWM has no feels_like min/max for the day; day/night stand in as the
+  // closest approximation of a "feels like" high/low.
+  feelsLikeLow: number
+  feelsLikeHigh: number
 }
 
 export interface WeatherData {
