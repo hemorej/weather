@@ -46,10 +46,18 @@ interface OWMAQIResponse {
   }>
 }
 
+interface OWMAQIForecastResponse {
+  list: Array<{
+    dt: number
+    main: { aqi: number }
+  }>
+}
+
 interface OWMForecastResponse {
   list: Array<{
     dt: number
-    main: { temp: number }
+    main: { temp: number; humidity: number }
+    wind: { speed: number; deg: number }
     weather?: OWMWeather[]
     clouds?: { all: number }
     pop: number
@@ -90,6 +98,16 @@ function conditionFromClouds(clouds: number, dt: number, sunrise: number, sunset
 function windDir(deg: number): string {
   const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']
   return dirs[Math.round(deg / 22.5) % 16]!
+}
+
+/**
+ * Coarser 8-point compass, lowercased, for the compact hourly-column suffix
+ * (e.g. "24kph.w") — the 16-point windDir() is too fine-grained to read at
+ * that size.
+ */
+function windDirShort(deg: number): string {
+  const dirs = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']
+  return dirs[Math.round(deg / 45) % 8]!
 }
 
 /**
@@ -149,6 +167,21 @@ function aqiLabel(aqi: number): string {
 }
 
 /**
+ * Matches each weather-hour timestamp to the closest available air-pollution
+ * forecast reading (also hourly, but from a separate OWM endpoint/timeline
+ * so the two don't line up exactly minute-for-minute).
+ */
+function nearestAqi(dt: number, aqiList: Array<{ dt: number; main: { aqi: number } }>): number {
+  let best = aqiList[0]
+  let bestDiff = Infinity
+  for (const item of aqiList) {
+    const diff = Math.abs(item.dt - dt)
+    if (diff < bestDiff) { bestDiff = diff; best = item }
+  }
+  return best?.main.aqi ?? 1
+}
+
+/**
  * Some regional alert sources (e.g. Environment Canada) use a "###" line to
  * separate the actual hazard description from boilerplate reporting/
  * monitoring instructions repeated on every alert. Drop everything from the
@@ -185,11 +218,12 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
   const base = `lat=${lat}&lon=${lon}&units=metric&appid=${key}`
 
   try {
-    const [currentRes, hourlyRes, dailyRes, aqiRes, forecastRes] = await Promise.all([
+    const [currentRes, hourlyRes, dailyRes, aqiRes, aqiForecastRes, forecastRes] = await Promise.all([
       $fetch<{ data: OWMCurrentData[]; timezone_offset: number }>(`${OWM}/data/4.0/onecall/current?${base}`),
       $fetch<{ data: OWMHourlyData[]; timezone_offset: number }>(`${OWM}/data/4.0/onecall/timeline/1h?${base}&cnt=24`),
       $fetch<{ data: OWMDailyData[]; timezone_offset: number }>(`${OWM}/data/4.0/onecall/timeline/1day?${base}&cnt=8`),
       $fetch<OWMAQIResponse>(`${OWM}/data/2.5/air_pollution?${base}`),
+      $fetch<OWMAQIForecastResponse>(`${OWM}/data/2.5/air_pollution/forecast?${base}`),
       $fetch<OWMForecastResponse>(`${OWM}/data/2.5/forecast?${base}`),
     ])
 
@@ -291,6 +325,10 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
         temp: Math.round(h.temp),
         conditionCode: cond,
         precip: Math.round(h.pop * 100),
+        wind: Math.round(h.wind_speed * 3.6), // m/s → km/h
+        windDir: windDirShort(h.wind_deg),
+        humidity: h.humidity,
+        aqi: nearestAqi(h.dt, aqiForecastRes.list),
       }
     })
 
@@ -326,6 +364,10 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
         temp: Math.round(item.main.temp),
         conditionCode: cond,
         precip: Math.round(item.pop * 100),
+        wind: Math.round(item.wind.speed * 3.6), // m/s → km/h
+        windDir: windDirShort(item.wind.deg),
+        humidity: item.main.humidity,
+        aqi: nearestAqi(item.dt, aqiForecastRes.list),
       }
     })
 

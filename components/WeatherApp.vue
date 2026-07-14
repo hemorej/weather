@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GeoLocation, WeatherData, WeatherDaily } from '~/types/weather'
+import type { GeoLocation, WeatherData, WeatherDaily, WeatherHourly } from '~/types/weather'
 import { useWeatherCache, useLocationStorage, fetchWeatherData } from '~/composables/useWeather'
 import { useGeocoding } from '~/composables/useGeocoding'
 import { useTemperatureColor } from '~/composables/useTemperatureColor'
@@ -33,6 +33,7 @@ const editingCity   = ref(false)
 const searchQuery   = ref('')
 const searchResults = ref<GeoLocation[]>([])
 const showAlert     = ref(false)
+const selectedMetric = ref<'rain' | 'wind' | 'humidity' | 'aqi'>('rain')
 
 // ── Template refs ─────────────────────────────────────────────────────────────
 const cityInputEl = ref<HTMLInputElement | null>(null)
@@ -72,6 +73,51 @@ function formatAlertTime(unixSeconds: number): string {
   })
 }
 
+// AQI 1–5 (Good → Very Poor) mapped to a green→red hue.
+function aqiColor(aqi: number): string {
+  const colors: Record<number, string> = {
+    1: '#4a9f5e', 2: '#8fae3f', 3: '#d4a017', 4: '#d4711f', 5: '#c2410c',
+  }
+  return colors[aqi] ?? '#777'
+}
+
+// Toggling the same metric again reverts the hourly column to its rain default.
+function selectMetric(key: string) {
+  if (!['rain', 'wind', 'humidity', 'aqi'].includes(key)) return
+  selectedMetric.value = selectedMetric.value === key ? 'rain' : (key as typeof selectedMetric.value)
+}
+
+// Unit context shown once in the column header rather than repeated on every
+// row, so per-row wind values can stay a plain "25 sw" instead of "25kph.sw".
+// Humidity/AQI use their indicator icon instead of text (see metricUnitIcon).
+const metricUnitLabel = computed(() => selectedMetric.value === 'wind' ? 'km/h' : '')
+
+const metricUnitIcon = computed(() => {
+  switch (selectedMetric.value) {
+    case 'humidity': return 'humidity'
+    case 'aqi':      return 'leaf'
+    default:         return null
+  }
+})
+
+function hourlyMetricValue(h: WeatherHourly): string {
+  switch (selectedMetric.value) {
+    case 'wind':     return `${h.wind}`
+    case 'humidity': return `${h.humidity}%`
+    case 'aqi':      return String(h.aqi)
+    default:         return h.precip > 0 ? `${h.precip}%` : ''
+  }
+}
+
+// Rain and humidity are both plain percentages, so they get distinct hues
+// (blue vs. teal) to stay visually distinguishable even though only one is
+// ever shown at a time.
+function hourlyMetricColor(h: WeatherHourly): string {
+  if (selectedMetric.value === 'aqi') return aqiColor(h.aqi)
+  if (selectedMetric.value === 'humidity') return '#4ba69a'
+  return '#6aa0d4'
+}
+
 function condIconName(cond: string, isNight: boolean): string {
   if (cond === 'clear') return isNight ? 'moon' : 'sun'
   if (cond === 'partly') return isNight ? 'partlyNight' : 'partly'
@@ -92,6 +138,7 @@ async function loadWeather(loc: GeoLocation) {
   error.value = null
   selectedDayIdx.value = null
   showAlert.value = false
+  selectedMetric.value = 'rain'
 
   const cached = cache.get(loc.lat, loc.lon)
   if (cached) {
@@ -326,11 +373,11 @@ onMounted(() => {
             v-for="ind in indicators"
             :key="ind.key"
             class="indicator"
-            :class="{ 'indicator--clickable': ind.key === 'alert' }"
+            :class="{ 'indicator--clickable': ind.key === 'alert' || ['rain','wind','humidity','aqi'].includes(ind.key) }"
             style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"
-            @click="ind.key === 'alert' && (showAlert = true)"
+            @click="ind.key === 'alert' ? (showAlert = true) : selectMetric(ind.key)"
           >
-            <WeatherIcon :name="ind.icon" :size="18" style="color:#777;" />
+            <WeatherIcon :name="ind.icon" :size="18" :style="{ color: ind.key === selectedMetric ? '#1a1a1a' : '#777' }" />
             <div :style="{ fontSize: '14px', fontWeight: 600, color: ind.accent ? '#c2410c' : '#1a1a1a', lineHeight: 1 }">
               {{ ind.value }}
             </div>
@@ -383,14 +430,20 @@ onMounted(() => {
 
           <!-- Hourly column (right) -->
           <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
-            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;margin-bottom:12px;flex-shrink:0;">{{ hourlyLabel }}</div>
+            <div style="display:grid;grid-template-columns:34px 1fr 40px 30px;column-gap:8px;margin-bottom:12px;flex-shrink:0;">
+              <div style="grid-column:1 / 3;font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;">{{ hourlyLabel }}</div>
+              <div style="display:flex;justify-content:flex-end;">
+                <WeatherIcon v-if="metricUnitIcon" :name="metricUnitIcon" :size="12" style="color:#d4d4d4;" />
+                <span v-else style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#d4d4d4;white-space:nowrap;">{{ metricUnitLabel }}</span>
+              </div>
+            </div>
             <div ref="hourlyEl" class="nb" style="height:308px;overflow-y:auto;" @scroll="onHourlyScroll">
               <template v-if="displayedHourly.length">
                 <div
                   v-for="h in displayedHourly"
                   :key="h.dt"
                   class="hourly-row"
-                  style="display:grid;grid-template-columns:34px 1fr 34px 30px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
+                  style="display:grid;grid-template-columns:34px 1fr 40px 30px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
                 >
                   <div :style="{ fontSize:'14px', fontWeight: h.label === 'Now' ? 700 : 500, color: h.label === 'Now' ? '#111' : '#8a8a8a', width:'34px' }">
                     {{ h.label === 'Now' ? 'Now' : `${h.label}h` }}
@@ -398,7 +451,13 @@ onMounted(() => {
                   <div style="display:flex;justify-content:center;color:#2a2a2a;">
                     <WeatherIcon :name="condIconName(h.conditionCode, h.isNight)" :size="22" />
                   </div>
-                  <div style="text-align:right;font-size:11px;font-weight:600;color:#6aa0d4;">{{ h.precip > 0 ? `${h.precip}%` : '' }}</div>
+                  <div style="text-align:right;font-size:11px;font-weight:600;white-space:nowrap;">
+                    <template v-if="selectedMetric === 'wind'">
+                      <span :style="{ color: hourlyMetricColor(h) }">{{ hourlyMetricValue(h) }}</span>
+                      <span style="color:#c2c2c2;font-weight:600;text-transform:uppercase;font-size:9px;margin-left:2px;">{{ h.windDir }}</span>
+                    </template>
+                    <span v-else :style="{ color: hourlyMetricColor(h) }">{{ hourlyMetricValue(h) }}</span>
+                  </div>
                   <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ h.temp }}°</div>
                 </div>
               </template>

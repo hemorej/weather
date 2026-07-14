@@ -36,6 +36,10 @@ export interface WeatherHourly {
   temp: number
   conditionCode: string
   precip: number     // precipitation probability %
+  wind: number       // km/h
+  windDir: string    // 8-point compass, lowercase (e.g. 'w', 'ne')
+  humidity: number   // %
+  aqi: number        // OWM's fixed 1-5 index (1 = Good … 5 = Very Poor), nearest hourly forecast match
 }
 
 export interface WeatherDaily {
@@ -49,8 +53,8 @@ export interface WeatherDaily {
 
 export interface WeatherData {
   current: WeatherCurrent
-  hourly: WeatherHourly[]   // 1-hour intervals, next 24 h (One Call 4.0)
-  forecast: WeatherHourly[] // 3-hour intervals, next 5 days (Forecast 5 API)
+  hourly: WeatherHourly[]     // 1-hour intervals, next 24 h (One Call 4.0)
+  forecast: WeatherHourly[]   // 3-hour intervals, next 5 days (Forecast 5 API)
   daily: WeatherDaily[]
 }
 
