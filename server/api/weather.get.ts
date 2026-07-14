@@ -1,4 +1,4 @@
-import type { WeatherData } from '~/types/weather'
+import type { WeatherData, WeatherAlertDetail } from '~/types/weather'
 
 const OWM = 'https://api.openweathermap.org'
 
@@ -151,6 +151,15 @@ function aqiLabel(aqi: number): string {
   return 'Poor'
 }
 
+/**
+ * Some regional alert sources (e.g. Environment Canada) append CAP section
+ * delimiters like a trailing "###" to the description text. Strip those
+ * plus surrounding whitespace so the overlay only shows prose.
+ */
+function cleanAlertDescription(text: string): string {
+  return text.replace(/#+\s*$/, '').trim()
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 /**
@@ -202,10 +211,14 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     // Fetch the first active alert to get a human-readable event name
     let alertActive = false
     let alertText = 'None'
+    let alertDetail: WeatherAlertDetail | null = null
     if (cur.alerts && cur.alerts.length > 0) {
       try {
         const alert = await $fetch<{
+          sender_name: string
           event: string
+          start: number
+          end: number
           description?: Array<{ language: string; description: string }> | string
         }>(`${OWM}/data/4.0/onecall/alert/${cur.alerts[0]}?appid=${key}`)
 
@@ -223,6 +236,14 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
         else if (searchText.includes('flood')) alertText = 'Flood'
         else if (searchText.includes('freeze') || searchText.includes('frost') || searchText.includes('snow')) alertText = 'Ice'
         else alertText = alert.event.split(' ')[0] || 'Alert'
+
+        alertDetail = {
+          event: alert.event || alertText,
+          senderName: alert.sender_name || 'Unknown source',
+          start: alert.start,
+          end: alert.end,
+          description: cleanAlertDescription(engDesc) || 'No further details available.',
+        }
       } catch {
         alertActive = true
         alertText = 'Alert'
@@ -241,6 +262,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
       aqiLabel: aqiLabel(aqi),
       alertActive,
       alertText,
+      alertDetail,
     }
 
     const hourly = hourlyRes.data.map((h, i) => {

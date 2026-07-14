@@ -18,6 +18,15 @@ export interface WeatherCurrent {
   aqiLabel: string   // 'Good' | 'Moderate' | 'Poor'
   alertActive: boolean
   alertText: string  // 'None' | 'Heat' | 'Storm' | etc.
+  alertDetail: WeatherAlertDetail | null
+}
+
+export interface WeatherAlertDetail {
+  event: string
+  senderName: string
+  start: number        // unix timestamp (seconds UTC)
+  end: number          // unix timestamp (seconds UTC)
+  description: string
 }
 
 export interface WeatherHourly {

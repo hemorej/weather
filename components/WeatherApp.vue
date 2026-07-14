@@ -32,6 +32,7 @@ const selectedDayIdx = ref<number | null>(null)
 const editingCity   = ref(false)
 const searchQuery   = ref('')
 const searchResults = ref<GeoLocation[]>([])
+const showAlert     = ref(false)
 
 // ── Template refs ─────────────────────────────────────────────────────────────
 const cityInputEl = ref<HTMLInputElement | null>(null)
@@ -65,6 +66,12 @@ const indicators = computed(() => {
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function formatAlertTime(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toLocaleString(undefined, {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  })
+}
+
 function condIconName(cond: string, isNight: boolean): string {
   if (cond === 'clear') return isNight ? 'moon' : 'sun'
   if (cond === 'partly') return isNight ? 'partlyNight' : 'partly'
@@ -84,6 +91,7 @@ async function loadWeather(loc: GeoLocation) {
   loading.value = true
   error.value = null
   selectedDayIdx.value = null
+  showAlert.value = false
 
   const cached = cache.get(loc.lat, loc.lon)
   if (cached) {
@@ -317,7 +325,10 @@ onMounted(() => {
           <div
             v-for="ind in indicators"
             :key="ind.key"
+            class="indicator"
+            :class="{ 'indicator--clickable': ind.key === 'alert' }"
             style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"
+            @click="ind.key === 'alert' && (showAlert = true)"
           >
             <WeatherIcon :name="ind.icon" :size="18" style="color:#777;" />
             <div :style="{ fontSize: '14px', fontWeight: 600, color: ind.accent ? '#c2410c' : '#1a1a1a', lineHeight: 1 }">
@@ -402,6 +413,29 @@ onMounted(() => {
 
 
     </div>
+
+    <!-- ── ALERT OVERLAY ────────────────────────────────────────────────────── -->
+    <Transition name="alert-fade">
+      <div
+        v-if="showAlert && weatherData?.current.alertDetail"
+        class="alert-overlay"
+        @click.self="showAlert = false"
+      >
+        <div class="alert-card">
+          <button class="alert-close" aria-label="Close" @click="showAlert = false">✕</button>
+          <div class="alert-card__header">
+            <WeatherIcon name="alert" :size="20" style="color:#c2410c;" />
+            <span class="alert-card__title">{{ weatherData.current.alertDetail.event }}</span>
+          </div>
+          <div class="alert-card__meta">
+            {{ formatAlertTime(weatherData.current.alertDetail.start) }} – {{ formatAlertTime(weatherData.current.alertDetail.end) }}
+          </div>
+          <div class="alert-card__sender">{{ weatherData.current.alertDetail.senderName }}</div>
+          <div class="alert-card__desc">{{ weatherData.current.alertDetail.description }}</div>
+        </div>
+      </div>
+    </Transition>
+
   <!-- ── LOADING OVERLAY (full-viewport) ─────────────────────────────────── -->
   <Transition name="load-fade">
     <div v-if="showLoading && !error" class="load-overlay" aria-hidden="true">
@@ -524,6 +558,83 @@ onMounted(() => {
   cursor: pointer;
 }
 .retry-btn:hover { background: #f5f5f5; }
+
+.indicator--clickable { cursor: pointer; }
+
+.alert-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 15, 10, 0.35);
+}
+
+.alert-card {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px 22px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.22);
+}
+
+.alert-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: #f2f2f2;
+  color: #777;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.alert-close:hover { background: #e6e6e6; }
+
+.alert-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 28px;
+}
+.alert-card__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+.alert-card__meta {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c2410c;
+}
+.alert-card__sender {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #9a9a9a;
+}
+.alert-card__desc {
+  margin-top: 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #333;
+  white-space: pre-line;
+}
+
+.alert-fade-enter-active,
+.alert-fade-leave-active { transition: opacity .2s ease; }
+.alert-fade-enter-from,
+.alert-fade-leave-to { opacity: 0; }
 
 .day-row { transition: background .15s ease; }
 .day-row:hover { background: rgba(0,0,0,0.03); }
