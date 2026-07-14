@@ -94,6 +94,7 @@ const metricUnitLabel = computed(() => selectedMetric.value === 'wind' ? 'km/h' 
 
 const metricUnitIcon = computed(() => {
   switch (selectedMetric.value) {
+    case 'rain':     return 'rain'
     case 'humidity': return 'humidity'
     case 'aqi':      return 'leaf'
     default:         return null
