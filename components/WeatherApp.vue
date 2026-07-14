@@ -761,6 +761,7 @@ onMounted(() => {
   overflow: hidden;
   background: hsl(212 44% 95%);
   animation: tintBreathe 4.5s ease-in-out infinite;
+  pointer-events: none;
 }
 .load-overlay__inner {
   width: 100%;
