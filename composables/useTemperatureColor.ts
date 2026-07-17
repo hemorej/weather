@@ -18,10 +18,15 @@ export function useTemperatureColor() {
     return `hsl(${hueFor(t).toFixed(0)} 72% 93%)`
   }
 
+  /** Dark-mode page-background wash: same hue map, flipped to near-black lightness. */
+  function darkTintFor(t: number): string {
+    return `hsl(${hueFor(t).toFixed(0)} 24% 11%)`
+  }
+
   /** Saturated fill color used for the 7-day low→high range-bar gradient. */
   function barColorFor(t: number): string {
     return `hsl(${hueFor(t).toFixed(0)} 68% 56%)`
   }
 
-  return { hueFor, tintFor, barColorFor }
+  return { hueFor, tintFor, darkTintFor, barColorFor }
 }
