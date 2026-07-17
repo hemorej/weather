@@ -3,6 +3,7 @@ import type { GeoLocation, WeatherData, WeatherDaily, WeatherHourly } from '~/ty
 import { useWeatherCache, useLocationStorage, fetchWeatherData } from '~/composables/useWeather'
 import { useGeocoding } from '~/composables/useGeocoding'
 import { useTemperatureColor } from '~/composables/useTemperatureColor'
+import { useDarkMode } from '~/composables/useDarkMode'
 
 // ── Default location ──────────────────────────────────────────────────────────
 const DEFAULT_LOCATION: GeoLocation = {
@@ -44,7 +45,22 @@ const hourlyEl    = ref<HTMLElement | null>(null)
 const cache    = useWeatherCache()
 const storage  = useLocationStorage()
 const geo      = useGeocoding()
-const { tintFor } = useTemperatureColor()
+const { tintFor, darkTintFor } = useTemperatureColor()
+const { isDark } = useDarkMode()
+
+// Tracks whichever temperature is currently driving bgColor, so the tint can
+// be recomputed in the new palette if isDark flips mid-session (system theme
+// change or crossing the 7pm/6am boundary) without needing a fresh scroll/fetch.
+const lastTintTemp = ref(20)
+
+function tintForTemp(t: number): string {
+  lastTintTemp.value = t
+  return isDark.value ? darkTintFor(t) : tintFor(t)
+}
+
+watch(isDark, () => {
+  bgColor.value = tintForTemp(lastTintTemp.value)
+})
 
 // ── Date string ───────────────────────────────────────────────────────────────
 const dateStr = computed(() => {
@@ -116,8 +132,8 @@ function hourlyMetricValue(h: WeatherHourly): string {
 // ever shown at a time.
 function hourlyMetricColor(h: WeatherHourly): string {
   if (selectedMetric.value === 'aqi') return aqiColor(h.aqi)
-  if (selectedMetric.value === 'humidity') return '#4ba69a'
-  return '#6aa0d4'
+  if (selectedMetric.value === 'humidity') return 'var(--accent-humidity)'
+  return 'var(--accent-rain)'
 }
 
 function condIconName(cond: string, isNight: boolean): string {
@@ -145,7 +161,7 @@ async function loadWeather(loc: GeoLocation) {
   const cached = cache.get(loc.lat, loc.lon)
   if (cached) {
     weatherData.value = cached
-    bgColor.value = tintFor(cached.current.temp)
+    bgColor.value = tintForTemp(cached.current.temp)
     loading.value = false
     return
   }
@@ -154,7 +170,7 @@ async function loadWeather(loc: GeoLocation) {
     const data = await fetchWeatherData(loc)
     weatherData.value = data
     cache.set(loc.lat, loc.lon, data)
-    bgColor.value = tintFor(data.current.temp)
+    bgColor.value = tintForTemp(data.current.temp)
   } catch (err: unknown) {
     const msg = (err as { data?: { message?: string } })?.data?.message
     error.value = msg ?? 'Failed to load weather. Check your API key and try again.'
@@ -280,8 +296,8 @@ function selectDay(i: number) {
     hourlyEl.value?.scrollTo({ top: 0 })
     const first = displayedHourly.value[0]
     bgColor.value = first
-      ? tintFor(first.temp)
-      : tintFor(weatherData.value?.current.temp ?? 20)
+      ? tintForTemp(first.temp)
+      : tintForTemp(weatherData.value?.current.temp ?? 20)
   })
 }
 
@@ -293,7 +309,7 @@ function onHourlyScroll() {
   if (!hrs.length) return
   const rowH = 44
   const idx = Math.max(0, Math.min(hrs.length - 1, Math.round(el.scrollTop / rowH)))
-  bgColor.value = tintFor(hrs[idx]!.temp)
+  bgColor.value = tintForTemp(hrs[idx]!.temp)
 }
 
 // ── Mount ─────────────────────────────────────────────────────────────────────
@@ -307,7 +323,9 @@ onMounted(() => {
 <template>
   <div
     :style="{ backgroundColor: bgColor, transition: 'background-color .55s ease' }"
-    style="height:100vh;display:flex;justify-content:center;color:#111;font-family:'Hanken Grotesk',system-ui,-apple-system,sans-serif;overflow:hidden;"
+    :class="{ dark: isDark }"
+    class="weather-app"
+    style="height:100vh;display:flex;justify-content:center;color:var(--fg-primary);font-family:'Hanken Grotesk',system-ui,-apple-system,sans-serif;overflow:hidden;"
   >
     <div style="width:100%;max-width:540px;height:100%;display:flex;flex-direction:column;padding:0 30px;" :aria-busy="showLoading">
 
@@ -328,7 +346,7 @@ onMounted(() => {
 
           <!-- Date + city -->
           <div style="padding-top:clamp(4px,1vh,10px);min-width:0;flex:1;display:flex;flex-direction:column;">
-            <div style="font-size:17px;font-weight:500;color:#9a9a9a;letter-spacing:.2px;margin-bottom:5px;">
+            <div style="font-size:17px;font-weight:500;color:var(--fg-tertiary);letter-spacing:.2px;margin-bottom:5px;">
               {{ dateStr }}
             </div>
 
@@ -386,11 +404,11 @@ onMounted(() => {
             style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"
             @click="ind.key === 'alert' ? (showAlert = true) : selectMetric(ind.key)"
           >
-            <WeatherIcon :name="ind.icon" :size="18" :style="{ color: ind.key === selectedMetric ? '#1a1a1a' : '#777' }" />
-            <div :style="{ fontSize: '14px', fontWeight: 600, color: ind.accent ? '#c2410c' : '#1a1a1a', lineHeight: 1 }">
+            <WeatherIcon :name="ind.icon" :size="18" :style="{ color: ind.key === selectedMetric ? 'var(--fg-secondary)' : 'var(--fg-faint)' }" />
+            <div :style="{ fontSize: '14px', fontWeight: 600, color: ind.accent ? 'var(--accent-alert)' : 'var(--fg-secondary)', lineHeight: 1 }">
               {{ ind.value }}
             </div>
-            <div style="font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#b4b4b4;">
+            <div style="font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--fg-muted);">
               {{ ind.label }}
             </div>
           </div>
@@ -404,7 +422,7 @@ onMounted(() => {
         style="flex:1;display:flex;align-items:center;justify-content:center;text-align:center;"
       >
         <div>
-          <div style="font-size:15px;color:#9a9a9a;margin-bottom:8px;">{{ error }}</div>
+          <div style="font-size:15px;color:var(--fg-tertiary);margin-bottom:8px;">{{ error }}</div>
           <button class="retry-btn" @click="loadWeather(location)">Try again</button>
         </div>
       </div>
@@ -415,23 +433,23 @@ onMounted(() => {
 
           <!-- 7-Day column (left) -->
           <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
-            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;margin-bottom:12px;flex-shrink:0;">7-Day</div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:12px;flex-shrink:0;">7-Day</div>
             <div class="nb" style="height:308px;overflow-y:auto;">
               <div
                 v-for="(d, i) in (weatherData?.daily ?? [])"
                 :key="i"
                 class="day-row"
                 :class="{ 'day-row--selected': selectedDayIdx === i && i !== todayDailyIdx }"
-                style="display:grid;grid-template-columns:34px 1fr 34px auto;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;cursor:pointer;"
+                style="display:grid;grid-template-columns:34px 1fr 34px auto;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid var(--border-row);cursor:pointer;"
                 @click="selectDay(i)"
               >
-                <div :style="{ fontSize:'14px', fontWeight: selectedDayIdx === i ? 600 : 500, color:'#1a1a1a', width:'34px' }">{{ d.dayLabel }}</div>
-                <div style="display:flex;justify-content:center;color:#2a2a2a;">
+                <div :style="{ fontSize:'14px', fontWeight: selectedDayIdx === i ? 600 : 500, color:'var(--fg-secondary)', width:'34px' }">{{ d.dayLabel }}</div>
+                <div style="display:flex;justify-content:center;color:var(--icon-color);">
                   <WeatherIcon :name="dailyIconName(d)" :size="22" />
                 </div>
-                <div style="text-align:right;font-size:11px;font-weight:600;color:#6aa0d4;">{{ d.precip > 0 ? `${d.precip}%` : '' }}</div>
+                <div style="text-align:right;font-size:11px;font-weight:600;color:var(--accent-rain);">{{ d.precip > 0 ? `${d.precip}%` : '' }}</div>
                 <div style="text-align:right;white-space:nowrap;font-size:14px;letter-spacing:.01em;">
-                  <span style="font-weight:600;color:#141414;">{{ feelsLikeMode ? d.feelsLikeHigh : d.high }}°</span><span style="color:#d2d2d2;font-weight:400;margin:0 3px;">/</span><span style="font-weight:400;color:#b0b0b0;">{{ feelsLikeMode ? d.feelsLikeLow : d.low }}°</span>
+                  <span style="font-weight:600;color:var(--fg-bold);">{{ feelsLikeMode ? d.feelsLikeHigh : d.high }}°</span><span style="color:var(--fg-sep);font-weight:400;margin:0 3px;">/</span><span style="font-weight:400;color:var(--fg-low);">{{ feelsLikeMode ? d.feelsLikeLow : d.low }}°</span>
                 </div>
               </div>
             </div>
@@ -440,10 +458,10 @@ onMounted(() => {
           <!-- Hourly column (right) -->
           <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
             <div style="display:grid;grid-template-columns:34px 1fr 40px 30px;column-gap:8px;margin-bottom:12px;flex-shrink:0;">
-              <div style="grid-column:1 / 3;font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#b4b4b4;">{{ hourlyLabel }}</div>
+              <div style="grid-column:1 / 3;font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-muted);">{{ hourlyLabel }}</div>
               <div style="display:flex;justify-content:flex-end;">
-                <WeatherIcon v-if="metricUnitIcon" :name="metricUnitIcon" :size="12" style="color:#d4d4d4;" />
-                <span v-else style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#d4d4d4;white-space:nowrap;">{{ metricUnitLabel }}</span>
+                <WeatherIcon v-if="metricUnitIcon" :name="metricUnitIcon" :size="12" style="color:var(--fg-muted-text);" />
+                <span v-else style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-muted-text);white-space:nowrap;">{{ metricUnitLabel }}</span>
               </div>
             </div>
             <div ref="hourlyEl" class="nb" style="height:308px;overflow-y:auto;" @scroll="onHourlyScroll">
@@ -452,25 +470,25 @@ onMounted(() => {
                   v-for="h in displayedHourly"
                   :key="h.dt"
                   class="hourly-row"
-                  style="display:grid;grid-template-columns:34px 1fr 40px 30px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid #f4f4f4;"
+                  style="display:grid;grid-template-columns:34px 1fr 40px 30px;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid var(--border-row);"
                 >
-                  <div :style="{ fontSize:'14px', fontWeight: h.label === 'Now' ? 700 : 500, color: h.label === 'Now' ? '#111' : '#8a8a8a', width:'34px' }">
+                  <div :style="{ fontSize:'14px', fontWeight: h.label === 'Now' ? 700 : 500, color: h.label === 'Now' ? 'var(--fg-primary)' : 'var(--fg-hour-label)', width:'34px' }">
                     {{ h.label === 'Now' ? 'Now' : `${h.label}h` }}
                   </div>
-                  <div style="display:flex;justify-content:center;color:#2a2a2a;">
+                  <div style="display:flex;justify-content:center;color:var(--icon-color);">
                     <WeatherIcon :name="condIconName(h.conditionCode, h.isNight)" :size="22" />
                   </div>
                   <div style="text-align:right;font-size:11px;font-weight:600;white-space:nowrap;">
                     <template v-if="selectedMetric === 'wind'">
                       <span :style="{ color: hourlyMetricColor(h) }">{{ hourlyMetricValue(h) }}</span>
-                      <span style="color:#c2c2c2;font-weight:600;text-transform:uppercase;font-size:9px;margin-left:2px;">{{ h.windDir }}</span>
+                      <span style="color:var(--fg-winddir);font-weight:600;text-transform:uppercase;font-size:9px;margin-left:2px;">{{ h.windDir }}</span>
                     </template>
                     <span v-else :style="{ color: hourlyMetricColor(h) }">{{ hourlyMetricValue(h) }}</span>
                   </div>
-                  <div style="text-align:right;font-size:14px;font-weight:600;color:#141414;">{{ feelsLikeMode ? h.feelsLike : h.temp }}°</div>
+                  <div style="text-align:right;font-size:14px;font-weight:600;color:var(--fg-bold);">{{ feelsLikeMode ? h.feelsLike : h.temp }}°</div>
                 </div>
               </template>
-              <div v-else-if="weatherData" style="height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#c0c0c0;">
+              <div v-else-if="weatherData" style="height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--fg-empty);">
                 No hourly data
               </div>
             </div>
@@ -492,7 +510,7 @@ onMounted(() => {
         <div class="alert-card">
           <button class="alert-close" aria-label="Close" @click="showAlert = false">✕</button>
           <div class="alert-card__header">
-            <WeatherIcon name="alert" :size="20" style="color:#c2410c;" />
+            <WeatherIcon name="alert" :size="20" style="color:var(--accent-alert);" />
             <span class="alert-card__title">
               {{ weatherData.current.alertDetails.length > 1 ? `${weatherData.current.alertDetails.length} Active Alerts` : weatherData.current.alertDetails[0]!.event }}
             </span>
@@ -555,20 +573,96 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.weather-app {
+  --fg-primary: #111;
+  --fg-secondary: #1a1a1a;
+  --fg-tertiary: #9a9a9a;
+  --fg-muted: #b4b4b4;
+  --fg-muted-text: #d4d4d4;
+  --fg-faint: #777;
+  --icon-color: #2a2a2a;
+  --fg-bold: #141414;
+  --fg-low: #b0b0b0;
+  --fg-sep: #d2d2d2;
+  --fg-hour-label: #8a8a8a;
+  --fg-winddir: #c2c2c2;
+  --fg-empty: #c0c0c0;
+  --accent-alert: #c2410c;
+  --accent-rain: #6aa0d4;
+  --accent-humidity: #4ba69a;
+  --border-row: #f4f4f4;
+  --border-col: #e8e8e8;
+  --border-divider: #eee;
+  --border-input: #d4d4d4;
+  --surface-card: #fff;
+  --surface-hover-a: #f8f8f8;
+  --surface-hover-b: #f5f5f5;
+  --surface-hover-c: #f2f2f2;
+  --surface-hover-d: #e6e6e6;
+  --row-hover: rgba(0, 0, 0, 0.03);
+  --overlay-bg: rgba(20, 15, 10, 0.35);
+  --desc-text: #333;
+  --city-hover: #000;
+  --sk-bg: rgba(17, 17, 17, 0.06);
+  --sk-bg-light: rgba(17, 17, 17, 0.05);
+  --sk-row-border: rgba(0, 0, 0, 0.035);
+  --load-overlay-bg: hsl(212 44% 95%);
+  --tint-breathe-a: hsl(212 38% 96.5%);
+  --tint-breathe-b: hsl(212 50% 93.5%);
+}
+
+.weather-app.dark {
+  --fg-primary: #f3f6f8;
+  --fg-secondary: #e9edf1;
+  --fg-tertiary: #7c8791;
+  --fg-muted: #5c686f;
+  --fg-muted-text: #5c686f;
+  --fg-faint: #8c99a3;
+  --icon-color: #c3ccd2;
+  --fg-bold: #eef2f4;
+  --fg-low: #5c686f;
+  --fg-sep: #3f4a52;
+  --fg-hour-label: #8a959d;
+  --fg-winddir: #5c686f;
+  --fg-empty: #5c686f;
+  --accent-alert: #e2643a;
+  --accent-rain: #7cb0e0;
+  --accent-humidity: #5cb8ab;
+  --border-row: rgba(255, 255, 255, 0.06);
+  --border-col: rgba(255, 255, 255, 0.08);
+  --border-divider: rgba(255, 255, 255, 0.08);
+  --border-input: rgba(255, 255, 255, 0.18);
+  --surface-card: #1c1f24;
+  --surface-hover-a: rgba(255, 255, 255, 0.05);
+  --surface-hover-b: rgba(255, 255, 255, 0.06);
+  --surface-hover-c: rgba(255, 255, 255, 0.08);
+  --surface-hover-d: rgba(255, 255, 255, 0.14);
+  --row-hover: rgba(255, 255, 255, 0.04);
+  --overlay-bg: rgba(0, 0, 0, 0.6);
+  --desc-text: #cfd3d8;
+  --city-hover: #fff;
+  --sk-bg: rgba(255, 255, 255, 0.07);
+  --sk-bg-light: rgba(255, 255, 255, 0.05);
+  --sk-row-border: rgba(255, 255, 255, 0.05);
+  --load-overlay-bg: hsl(212 26% 12%);
+  --tint-breathe-a: hsl(212 26% 12%);
+  --tint-breathe-b: hsl(212 32% 15%);
+}
+
 .city-btn {
   background: none;
   border: none;
   font-family: inherit;
   font-size: 24px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--fg-secondary);
   letter-spacing: -0.01em;
   cursor: pointer;
   padding: 0;
   text-align: left;
   line-height: 1;
 }
-.city-btn:hover { color: #000; }
+.city-btn:hover { color: var(--city-hover); }
 
 .temp-btn {
   background: none;
@@ -578,7 +672,7 @@ onMounted(() => {
   font-weight: 200;
   line-height: .84;
   letter-spacing: -0.045em;
-  color: #0f0f0f;
+  color: var(--fg-primary);
   cursor: pointer;
   padding: 0;
   transition: color .15s ease;
@@ -590,17 +684,17 @@ onMounted(() => {
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: #6aa0d4;
+  color: var(--accent-rain);
 }
 
 .city-input {
   font-family: inherit;
   font-size: 24px;
   font-weight: 600;
-  color: #111;
+  color: var(--fg-primary);
   background: transparent;
   border: none;
-  border-bottom: 1.5px solid #d4d4d4;
+  border-bottom: 1.5px solid var(--border-input);
   outline: none;
   padding: 0 0 2px;
   width: 100%;
@@ -612,8 +706,8 @@ onMounted(() => {
   top: calc(100% + 6px);
   left: 0;
   min-width: 240px;
-  background: #fff;
-  border: 1px solid #e8e8e8;
+  background: var(--surface-card);
+  border: 1px solid var(--border-col);
   border-radius: 10px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -631,35 +725,35 @@ onMounted(() => {
   border: none;
   cursor: pointer;
   font-family: inherit;
-  border-bottom: 1px solid #f4f4f4;
+  border-bottom: 1px solid var(--border-row);
 }
 .search-result:last-child { border-bottom: none; }
-.search-result:hover { background: #f8f8f8; }
+.search-result:hover { background: var(--surface-hover-a); }
 
 .result-name {
   font-size: 14px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--fg-secondary);
   line-height: 1.3;
 }
 .result-meta {
   font-size: 12px;
   font-weight: 500;
-  color: #9a9a9a;
+  color: var(--fg-tertiary);
 }
 
 .retry-btn {
   font-family: inherit;
   font-size: 14px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--fg-secondary);
   background: none;
-  border: 1.5px solid #d4d4d4;
+  border: 1.5px solid var(--border-input);
   border-radius: 8px;
   padding: 8px 20px;
   cursor: pointer;
 }
-.retry-btn:hover { background: #f5f5f5; }
+.retry-btn:hover { background: var(--surface-hover-b); }
 
 .indicator--clickable { cursor: pointer; }
 
@@ -671,7 +765,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(20, 15, 10, 0.35);
+  background: var(--overlay-bg);
 }
 
 .alert-card {
@@ -680,7 +774,7 @@ onMounted(() => {
   max-width: 380px;
   max-height: 80vh;
   overflow-y: auto;
-  background: #fff;
+  background: var(--surface-card);
   border-radius: 16px;
   padding: 24px 22px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.22);
@@ -694,13 +788,13 @@ onMounted(() => {
   height: 26px;
   border-radius: 50%;
   border: none;
-  background: #f2f2f2;
-  color: #777;
+  background: var(--surface-hover-c);
+  color: var(--fg-faint);
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
 }
-.alert-close:hover { background: #e6e6e6; }
+.alert-close:hover { background: var(--surface-hover-d); }
 
 .alert-card__header {
   display: flex;
@@ -711,37 +805,37 @@ onMounted(() => {
 .alert-card__title {
   font-size: 17px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--fg-secondary);
 }
 .alert-card__meta {
   margin-top: 10px;
   font-size: 12px;
   font-weight: 600;
-  color: #c2410c;
+  color: var(--accent-alert);
 }
 .alert-card__sender {
   margin-top: 4px;
   font-size: 12px;
   font-weight: 500;
-  color: #9a9a9a;
+  color: var(--fg-tertiary);
 }
 .alert-card__desc {
   margin-top: 14px;
   font-size: 14px;
   line-height: 1.55;
-  color: #333;
+  color: var(--desc-text);
   white-space: pre-line;
 }
 
 .alert-item--divided {
   margin-top: 20px;
   padding-top: 18px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-divider);
 }
 .alert-item__title {
   font-size: 14px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--fg-secondary);
   text-transform: capitalize;
 }
 
@@ -751,7 +845,7 @@ onMounted(() => {
 .alert-fade-leave-to { opacity: 0; }
 
 .day-row { transition: background .15s ease; }
-.day-row:hover { background: rgba(0,0,0,0.03); }
+.day-row:hover { background: var(--row-hover); }
 .day-row--selected { position: relative; }
 .day-row--selected::after {
   content: '';
@@ -760,7 +854,7 @@ onMounted(() => {
   left: 0;
   right: -30px;
   height: 2px;
-  background: #1a1a1a;
+  background: var(--fg-secondary);
   z-index: 1;
 }
 
@@ -772,12 +866,12 @@ onMounted(() => {
   top: 0;
   bottom: 0;
   width: 1px;
-  background: #e8e8e8;
+  background: var(--border-col);
 }
 
 @keyframes tintBreathe {
-  0%, 100% { background-color: hsl(212 38% 96.5%); }
-  50%       { background-color: hsl(212 50% 93.5%); }
+  0%, 100% { background-color: var(--tint-breathe-a); }
+  50%       { background-color: var(--tint-breathe-b); }
 }
 @keyframes skpulse {
   0%, 100% { opacity: .5; }
@@ -790,7 +884,7 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   overflow: hidden;
-  background: hsl(212 44% 95%);
+  background: var(--load-overlay-bg);
   animation: tintBreathe 4.5s ease-in-out infinite;
   pointer-events: none;
 }
@@ -806,10 +900,10 @@ onMounted(() => {
 .load-fade-leave-to     { opacity: 0; }
 
 .sk {
-  background: rgba(17, 17, 17, 0.06);
+  background: var(--sk-bg);
   animation: skpulse 1.9s ease-in-out infinite;
 }
-.sk--light  { background: rgba(17, 17, 17, 0.05); }
+.sk--light  { background: var(--sk-bg-light); }
 .sk--temp   { width: 186px; height: 104px; border-radius: 14px; flex-shrink: 0; }
 .sk--circle { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; }
 
@@ -818,7 +912,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   height: 44px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.035);
+  border-bottom: 1px solid var(--sk-row-border);
 }
 
 @media (max-width: 480px) {
