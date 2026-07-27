@@ -448,7 +448,7 @@ onMounted(() => {
                   <WeatherIcon :name="dailyIconName(d)" :size="22" />
                 </div>
                 <div style="text-align:right;font-size:11px;font-weight:600;color:var(--accent-rain);">{{ d.precip > 0 ? `${d.precip}%` : '' }}</div>
-                <div style="text-align:right;white-space:nowrap;font-size:14px;letter-spacing:.01em;">
+                <div class="day-temp" style="text-align:right;white-space:nowrap;font-size:14px;letter-spacing:.01em;">
                   <span style="font-weight:600;color:var(--fg-bold);">{{ feelsLikeMode ? d.feelsLikeHigh : d.high }}°</span><span style="color:var(--fg-sep);font-weight:400;margin:0 3px;">/</span><span style="font-weight:400;color:var(--fg-low);">{{ feelsLikeMode ? d.feelsLikeLow : d.low }}°</span>
                 </div>
               </div>
@@ -485,7 +485,7 @@ onMounted(() => {
                     </template>
                     <span v-else :style="{ color: hourlyMetricColor(h) }">{{ hourlyMetricValue(h) }}</span>
                   </div>
-                  <div style="text-align:right;font-size:14px;font-weight:600;color:var(--fg-bold);">{{ feelsLikeMode ? h.feelsLike : h.temp }}°</div>
+                  <div class="hourly-temp" style="text-align:right;font-size:14px;font-weight:600;color:var(--fg-bold);">{{ feelsLikeMode ? h.feelsLike : h.temp }}°</div>
                 </div>
               </template>
               <div v-else-if="weatherData" style="height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--fg-empty);">
@@ -922,5 +922,7 @@ onMounted(() => {
   .forecast-col:last-child  { width: auto !important; flex: 0 0 auto !important; }
   .hourly-row { grid-template-columns: 34px 1fr 34px 30px !important; }
   .day-row--selected::after { right: -8px; }
+  .day-row { column-gap: 4px !important; }
+  .day-temp, .hourly-temp { font-size: 12px !important; }
 }
 </style>
