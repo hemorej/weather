@@ -675,6 +675,7 @@ onMounted(() => {
   color: var(--fg-primary);
   cursor: pointer;
   padding: 0;
+  margin-left: 0;
   transition: color .15s ease;
 }
 .temp-btn:disabled { cursor: default; }
@@ -924,5 +925,13 @@ onMounted(() => {
   .day-row--selected::after { right: -8px; }
   .day-row { column-gap: 4px !important; }
   .day-temp, .hourly-temp { font-size: 12px !important; }
+}
+
+@media (min-width: 481px) {
+  /* Above the 480px breakpoint, .forecast-row's fixed-width columns no
+     longer fill the row, so justify-content: center insets them 26px
+     from the container edge. Match that so the temperature lines up
+     with the 7-day column below it. */
+  .temp-btn { margin-left: 26px; }
 }
 </style>
