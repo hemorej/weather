@@ -143,7 +143,7 @@ function condIconName(cond: string, isNight: boolean): string {
 }
 
 // The daily conditionCode comes from OWM's own icon pick, which can disagree
-// with our derived rain probability (e.g. "cloudy" on a day that's 100%
+// with OWM's own rain probability (e.g. "cloudy" on a day that's 100%
 // likely to rain). Above the threshold, force the rain icon so they agree.
 function dailyIconName(d: WeatherDaily): string {
   if (d.precip >= 50 && d.conditionCode !== 'storm') return 'rain'
