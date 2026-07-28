@@ -180,6 +180,8 @@ function cleanAlertDescription(text: string): string {
  * The API key never leaves the server — callers receive only the shaped data.
  */
 export default defineEventHandler(async (event): Promise<WeatherData> => {
+  enforceOrigin(event)
+
   const config = useRuntimeConfig()
 
   // h3 v2 (Nuxt 3.16+) getQuery fails on relative URLs in dev; parse manually

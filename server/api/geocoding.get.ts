@@ -16,6 +16,8 @@ interface OWMGeoResult {
  * The API key is kept server-side and never exposed to the browser.
  */
 export default defineEventHandler(async (event): Promise<GeoLocation[]> => {
+  enforceOrigin(event)
+
   const config = useRuntimeConfig()
 
   // h3 v2 (Nuxt 3.16+) getQuery fails on relative URLs in dev; parse manually
