@@ -45,6 +45,10 @@ export default defineEventHandler(async (event): Promise<GeoLocation[]> => {
   } catch (err: unknown) {
     const e = err as Record<string, any>
     const status: number | undefined = e?.status ?? e?.response?.status
+    getLogger('geocoding').error('geocoding.owm_request_failed', {
+      requestId: event.context.requestId,
+      status,
+    })
     if (status === 401) throw createError({ statusCode: 401, message: 'Invalid API key' })
     throw createError({ statusCode: 502, message: 'Geocoding service unavailable' })
   }

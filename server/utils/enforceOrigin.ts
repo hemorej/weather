@@ -32,6 +32,7 @@ export function enforceOrigin(event: H3Event) {
   }
 
   if (candidate && !ALLOWED_ORIGINS.includes(candidate)) {
+    getLogger('http').warn('http.origin_rejected', { requestId: event.context.requestId, candidate })
     throw createError({ statusCode: 403, message: 'Forbidden' })
   }
 

@@ -360,7 +360,11 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     // ofetch stores parsed response body in err.response._data
     const owmMessage: string = e?.response?._data?.message ?? e?.data?.message ?? ''
 
-    console.error(`[weather] OWM error — status: ${status}, message: ${owmMessage}`)
+    getLogger('weather').error('weather.owm_request_failed', {
+      requestId: event.context.requestId,
+      status,
+      owmMessage,
+    })
 
     if (status === 401) {
       throw createError({
