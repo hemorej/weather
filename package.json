@@ -19,7 +19,7 @@
     "@nuxt/devtools": "latest",
     "@types/node": "^26.1.2",
     "typescript": "^5.5.0",
-    "vue-tsc": "^3.3.8"
+    "vue-tsc": "^3.3.9"
   },
   "packageManager": "pnpm@11.9.0"
 }
