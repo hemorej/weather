@@ -1,5 +1,7 @@
 # Weather App
 
+[![Laravel Forge Site Deployment Status](https://img.shields.io/endpoint?url=https%3A%2F%2Fforge.laravel.com%2Fsite-badges%2F18defe55-bea2-4349-8655-0568668b7c0b&style=plastic)](https://forge.laravel.com/jerome-zpm/resilient-bird/3266687)
+
 A minimalist single-page weather app built with **Nuxt 3**, **Vue 3**, and **TypeScript**, powered by the [OpenWeatherMap One Call API 4.0](https://openweathermap.org/api/one-call-4).
 
 ## Features
