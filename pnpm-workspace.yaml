@@ -3,15 +3,6 @@ allowBuilds:
   esbuild: true
   fsevents: true
 
-# Patched versions for high-severity advisories flagged by `pnpm audit`
-# in nuxt/nitropack's own transitive tree (build tooling only, not
-# shipped to the browser). Bump/remove once nuxt upgrades these itself.
-overrides:
-  brace-expansion: '>=5.0.9'
-  'svgo@4': '>=4.0.2'
-  postcss: '>=8.5.23'
-  tar: '>=7.5.21'
-
 # Supply-chain safety net: refuse to resolve/install package versions
 # published more recently than this window. Malicious or compromised
 # releases are typically caught and pulled from the registry within
