@@ -10,6 +10,13 @@
 // This is a heuristic, not proof: legitimate maintainer handoffs happen
 // too. Treat a flag as "stop and verify against the project's official
 // releases/changelog", not as certain compromise.
+//
+// Versions published via npm's OIDC-based Trusted Publishing show up as
+// publisher "GitHub Actions" with a `trustedPublisher` field on the npm
+// user, even though a human maintainer triggered the release from their
+// own repo. That's a stronger authenticity signal than a personal token
+// (no long-lived credential to steal, tied to the repo via OIDC), so
+// those are exempted rather than flagged.
 
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -56,6 +63,7 @@ async function getPublisherInfo(name, version) {
   const packument = await res.json();
   const versionMeta = packument.versions?.[version];
   const publisher = versionMeta?._npmUser?.name;
+  const trustedPublisher = versionMeta?._npmUser?.trustedPublisher;
   const time = packument.time || {};
   const targetTime = time[version] ? new Date(time[version]) : null;
   if (!publisher || !targetTime) return null;
@@ -70,7 +78,7 @@ async function getPublisherInfo(name, version) {
     priorVersions.map((v) => packument.versions?.[v]?._npmUser?.name).filter(Boolean)
   );
 
-  return { publisher, priorPublishers };
+  return { publisher, priorPublishers, trustedPublisher };
 }
 
 async function main() {
@@ -104,6 +112,7 @@ async function main() {
       continue;
     }
     if (!info || info.priorPublishers.size === 0) continue; // nothing to compare against
+    if (info.trustedPublisher) continue; // published via npm OIDC trusted publishing, not a personal token
     if (!info.priorPublishers.has(info.publisher)) {
       warnings.push(
         `${name}@${version} was published by npm user "${info.publisher}", who is not among the ` +
