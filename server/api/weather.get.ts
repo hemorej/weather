@@ -1,102 +1,99 @@
-import type { WeatherData, WeatherAlertDetail } from '~/types/weather'
+import type { WeatherData, WeatherHourly, WeatherAlertDetail } from '~/types/weather'
 
-const OWM = 'https://api.openweathermap.org'
+const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast'
+const OPEN_METEO_AQI = 'https://air-quality-api.open-meteo.com/v1/air-quality'
+const GEOMET_ALERTS = 'https://api.weather.gc.ca/collections/weather-alerts/items'
 
-// ── OWM response shapes ───────────────────────────────────────────────────────
+// ── Open-Meteo / ECCC response shapes ──────────────────────────────────────────
 
-interface OWMWeather { id: number; main: string; icon: string }
-
-interface OWMCurrentData {
-  dt: number
-  sunrise: number
-  sunset: number
-  temp: number
-  feels_like: number
-  humidity: number
-  wind_speed: number  // m/s — converted to km/h before returning
-  wind_deg: number
-  clouds?: number
-  weather: OWMWeather[]
-  rain?: { '1h': number }
-  alerts?: string[]   // alert UUIDs; details fetched separately
+interface OpenMeteoCurrent {
+  time: string
+  temperature_2m: number
+  apparent_temperature: number
+  relative_humidity_2m: number
+  weather_code: number
+  wind_speed_10m: number
+  wind_direction_10m: number
+  is_day: number
+  precipitation_probability: number
 }
 
-interface OWMHourlyData {
-  dt: number
-  temp: number
-  feels_like: number
-  humidity: number
-  wind_speed: number
-  wind_deg: number
-  clouds?: number
-  pop: number         // probability of precipitation, 0–1
-  weather?: OWMWeather[]
+interface OpenMeteoHourly {
+  time: string[]
+  temperature_2m: number[]
+  apparent_temperature: number[]
+  relative_humidity_2m: number[]
+  weather_code: number[]
+  wind_speed_10m: number[]
+  wind_direction_10m: number[]
+  precipitation_probability: number[]
+  is_day: number[]
 }
 
-interface OWMDailyData {
-  dt: number
-  temp: { day: number; min: number; max: number; night: number; morn: number; eve: number }
-  // OWM has no min/max equivalent for feels_like — day/night stand in as the
-  // closest approximation of a daily high/low when toggled.
-  feels_like: { day: number; night: number; eve: number; morn: number }
-  pop: number | null  // OWM's daily pop has proven unreliable; see deriveDailyPop
-  clouds?: number
-  weather?: OWMWeather[]
+interface OpenMeteoDaily {
+  time: string[]
+  weather_code: number[]
+  temperature_2m_max: number[]
+  temperature_2m_min: number[]
+  apparent_temperature_max: number[]
+  apparent_temperature_min: number[]
+  precipitation_probability_max: number[]
 }
 
-interface OWMAQIResponse {
-  list: Array<{
-    main: { aqi: number }
-  }>
+interface OpenMeteoForecastResponse {
+  utc_offset_seconds: number
+  current: OpenMeteoCurrent
+  hourly: OpenMeteoHourly
+  daily: OpenMeteoDaily
 }
 
-interface OWMAQIForecastResponse {
-  list: Array<{
-    dt: number
-    main: { aqi: number }
-  }>
+interface OpenMeteoAQIResponse {
+  utc_offset_seconds: number
+  current: { european_aqi: number }
+  hourly: { time: string[]; european_aqi: number[] }
 }
 
-interface OWMForecastResponse {
-  list: Array<{
-    dt: number
-    main: { temp: number; feels_like: number; humidity: number }
-    wind: { speed: number; deg: number }
-    weather?: OWMWeather[]
-    clouds?: { all: number }
-    pop: number
-    sys?: { pod: string }
-  }>
-  city: { sunrise: number; sunset: number; timezone: number }
+interface GeoMetAlertFeature {
+  properties: {
+    alert_name_en: string
+    alert_short_name_en: string
+    alert_text_en: string
+    status_en: string   // 'issued' | 'continued' | 'ended' — CAP message lifecycle, not a validity flag
+    validity_datetime: string
+    expiration_datetime: string
+  }
+}
+
+interface GeoMetAlertsResponse {
+  features: GeoMetAlertFeature[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * Maps an OWM icon code (e.g. "01d", "10n") to an internal condition string
- * and a day/night flag. The OWM suffix already encodes day (d) vs night (n),
- * so we can derive both from one field rather than comparing against sunrise/sunset.
+ * Open-Meteo's `timezone=auto` returns local, timezone-naive timestamps
+ * ("2026-08-25T09:00", or "2026-08-25" for daily entries) rather than unix
+ * time. Converting back to true unix UTC lets the rest of this file keep
+ * using the same offset-based local*() helpers OWM's shaping used.
  */
-function conditionFromIcon(icon: string): { cond: string; isNight: boolean } {
-  const isNight = icon.endsWith('n')
-  const condMap: Record<string, string> = {
-    '01': 'clear', '02': 'partly', '03': 'cloudy', '04': 'cloudy',
-    '09': 'rain',  '10': 'rain',   '11': 'storm',  '13': 'rain', '50': 'fog',
-  }
-  return { cond: condMap[icon.slice(0, 2)] ?? 'cloudy', isNight }
+function toUnixDt(localTimeStr: string, utcOffsetSeconds: number): number {
+  const iso = localTimeStr.includes('T') ? localTimeStr : `${localTimeStr}T00:00:00`
+  return Math.round(Date.parse(`${iso}Z`) / 1000) - utcOffsetSeconds
 }
 
 /**
- * Fallback condition inference when a record lacks a weather icon (can happen
- * on some OWM One Call 4.0 timeline responses). Uses cloud cover percentage
- * and compares dt against today's sunrise/sunset for day/night.
+ * WMO weather-interpretation codes (the `weather_code` field) collapsed onto
+ * this app's existing icon-name vocabulary. WeatherIcon.vue has no dedicated
+ * snow icon — matching the previous OWM mapping (whose snow icon '13' also
+ * fell into 'rain'), snow codes (71-86) map to 'rain' too.
  */
-function conditionFromClouds(clouds: number, dt: number, sunrise: number, sunset: number) {
-  const isNight = dt < sunrise || dt > sunset
-  let cond = 'clear'
-  if (clouds > 80) cond = 'cloudy'
-  else if (clouds > 20) cond = 'partly'
-  return { cond, isNight }
+function conditionFromWMO(code: number): string {
+  if (code === 0) return 'clear'
+  if (code === 1 || code === 2) return 'partly'
+  if (code === 3) return 'cloudy'
+  if (code === 45 || code === 48) return 'fog'
+  if (code >= 95) return 'storm'
+  return 'rain' // drizzle, rain, freezing rain, snow, showers: 51-86
 }
 
 function windDir(deg: number): string {
@@ -114,13 +111,6 @@ function windDirShort(deg: number): string {
   return dirs[Math.round(deg / 45) % 8]!
 }
 
-/**
- * Hour/day/date-key readers below all take an explicit UTC offset (seconds,
- * from OWM's timezone_offset / city.timezone) rather than using the host's
- * local timezone. `new Date(dt * 1000).getHours()` reads the *server's* TZ,
- * which drifts from the queried location's calendar day/hour whenever the
- * two differ — this was silently mislabeling hours and day names.
- */
 function localHour(dt: number, offsetSeconds: number): number {
   return new Date((dt + offsetSeconds) * 1000).getUTCHours()
 }
@@ -129,38 +119,20 @@ function localDayOfWeek(dt: number, offsetSeconds: number): number {
   return new Date((dt + offsetSeconds) * 1000).getUTCDay()
 }
 
-function localDateKey(dt: number, offsetSeconds: number): string {
-  return new Date((dt + offsetSeconds) * 1000).toISOString().slice(0, 10)
+/**
+ * European Air Quality Index (0-100+, the EEA's official scale) collapsed
+ * onto this app's existing 1-5 badge scale, whose labels (aqiLabel below)
+ * already match EAQI's first five band names. EAQI's top two bands ("Very
+ * Poor" 80-100 and "Extremely Poor" 100+) both collapse to 5/"Very Poor".
+ */
+function eaqiToFive(value: number): number {
+  if (value < 20) return 1
+  if (value < 40) return 2
+  if (value < 60) return 3
+  if (value < 80) return 4
+  return 5
 }
 
-/**
- * OWM's daily `pop` (from the One Call `timeline/1day` endpoint) has been
- * observed to disagree sharply with its own 3h-interval forecast — e.g.
- * reporting 95% for a day whose 3h buckets all show 0%. Derive a per-day
- * probability from the 3h-interval 5-day forecast instead: treating each
- * bucket's pop as an independent chance of rain, the probability of rain at
- * some point in the day is 1 minus the chance it stays dry all day.
- */
-function deriveDailyPop(items: Array<{ dt: number; pop: number }>, offsetSeconds: number): Map<string, number> {
-  const byDay = new Map<string, number[]>()
-  for (const item of items) {
-    const key = localDateKey(item.dt, offsetSeconds)
-    if (!byDay.has(key)) byDay.set(key, [])
-    byDay.get(key)!.push(item.pop)
-  }
-  const result = new Map<string, number>()
-  for (const [key, pops] of byDay) {
-    const probDry = pops.reduce((acc, p) => acc * (1 - p), 1)
-    result.set(key, Math.round((1 - probDry) * 100))
-  }
-  return result
-}
-
-/**
- * OWM's Air Pollution API reports `main.aqi` on a fixed 1–5 scale
- * (Good, Fair, Moderate, Poor, Very Poor) rather than the pollutant
- * concentration itself.
- */
 function aqiLabel(aqi: number): string {
   const labels: Record<number, string> = {
     1: 'Good',
@@ -173,18 +145,18 @@ function aqiLabel(aqi: number): string {
 }
 
 /**
- * Matches each weather-hour timestamp to the closest available air-pollution
- * forecast reading (also hourly, but from a separate OWM endpoint/timeline
- * so the two don't line up exactly minute-for-minute).
+ * Matches each weather-hour timestamp to the closest available air-quality
+ * reading — a safety net in case the two Open-Meteo models don't share an
+ * identical hourly time grid for a given location.
  */
-function nearestAqi(dt: number, aqiList: Array<{ dt: number; main: { aqi: number } }>): number {
-  let best = aqiList[0]
+function nearestAqi(dt: number, times: number[], values: number[]): number {
+  let bestIdx = 0
   let bestDiff = Infinity
-  for (const item of aqiList) {
-    const diff = Math.abs(item.dt - dt)
-    if (diff < bestDiff) { bestDiff = diff; best = item }
+  for (let i = 0; i < times.length; i++) {
+    const diff = Math.abs(times[i]! - dt)
+    if (diff < bestDiff) { bestDiff = diff; bestIdx = i }
   }
-  return best?.main.aqi ?? 1
+  return eaqiToFive(values[bestIdx] ?? 0)
 }
 
 /**
@@ -197,19 +169,42 @@ function cleanAlertDescription(text: string): string {
   return text.split(/^\s*#+\s*$/m)[0]!.trim()
 }
 
+/** Shapes one Open-Meteo hourly array index into the app's WeatherHourly record. */
+function buildHourlyEntry(
+  h: OpenMeteoHourly,
+  idx: number,
+  dt: number,
+  label: string,
+  aqiDts: number[],
+  aqiValues: number[],
+): WeatherHourly {
+  return {
+    dt,
+    label,
+    isNight: h.is_day[idx] === 0,
+    temp: Math.round(h.temperature_2m[idx]!),
+    feelsLike: Math.round(h.apparent_temperature[idx]!),
+    conditionCode: conditionFromWMO(h.weather_code[idx]!),
+    precip: Math.round(h.precipitation_probability[idx]!),
+    wind: Math.round(h.wind_speed_10m[idx]!),
+    windDir: windDirShort(h.wind_direction_10m[idx]!),
+    humidity: h.relative_humidity_2m[idx]!,
+    aqi: nearestAqi(dt, aqiDts, aqiValues),
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 /**
- * Fetches current conditions, hourly (up to 24 h), 7-day daily forecast, and
- * air quality in parallel, then shapes the combined response into the app's
- * internal WeatherData format.
- *
- * The API key never leaves the server — callers receive only the shaped data.
+ * Fetches current conditions, hourly (16-day model horizon), 7-day daily
+ * forecast and air quality from Open-Meteo (no API key required), plus
+ * active Canadian weather alerts from Environment Canada's public GeoMet
+ * API, then shapes the combined result into the app's internal WeatherData
+ * format. International alerts are not yet supported — GeoMet naturally
+ * returns nothing outside Canada, so alertActive just stays false there.
  */
 export default defineEventHandler(async (event): Promise<WeatherData> => {
   enforceOrigin(event)
-
-  const config = useRuntimeConfig()
 
   // h3 v2 (Nuxt 3.16+) getQuery fails on relative URLs in dev; parse manually
   const rawUrl = event.node.req.url ?? ''
@@ -220,191 +215,130 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
 
   if (!lat || !lon) throw createError({ statusCode: 400, message: 'lat and lon required' })
 
-  const key = config.openWeatherApiKey
-  if (!key) throw createError({ statusCode: 500, message: 'API key not configured' })
-
-  const base = `lat=${lat}&lon=${lon}&units=metric&appid=${key}`
+  const forecastUrl = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation_probability` +
+    `&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation_probability,is_day` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_probability_max` +
+    `&timezone=auto&forecast_days=8`
+  const aqiUrl = `${OPEN_METEO_AQI}?latitude=${lat}&longitude=${lon}&current=european_aqi&hourly=european_aqi&timezone=auto`
 
   try {
-    const [currentRes, hourlyRes, dailyRes, aqiRes, aqiForecastRes, forecastRes] = await Promise.all([
-      $fetch<{ data: OWMCurrentData[]; timezone_offset: number }>(`${OWM}/data/4.0/onecall/current?${base}`),
-      $fetch<{ data: OWMHourlyData[]; timezone_offset: number }>(`${OWM}/data/4.0/onecall/timeline/1h?${base}&cnt=24`),
-      $fetch<{ data: OWMDailyData[]; timezone_offset: number }>(`${OWM}/data/4.0/onecall/timeline/1day?${base}&cnt=8`),
-      $fetch<OWMAQIResponse>(`${OWM}/data/2.5/air_pollution?${base}`),
-      $fetch<OWMAQIForecastResponse>(`${OWM}/data/2.5/air_pollution/forecast?${base}`),
-      $fetch<OWMForecastResponse>(`${OWM}/data/2.5/forecast?${base}`),
+    const [forecast, aqi] = await Promise.all([
+      $fetch<OpenMeteoForecastResponse>(forecastUrl),
+      $fetch<OpenMeteoAQIResponse>(aqiUrl),
     ])
 
-    // Same location across all three onecall calls, so one offset covers them all.
-    const tzOffset = currentRes.timezone_offset
-    const forecastTzOffset = forecastRes.city.timezone
+    const tzOffset = forecast.utc_offset_seconds
+    const aqiDts = aqi.hourly.time.map(t => toUnixDt(t, aqi.utc_offset_seconds))
 
-    const cur = currentRes.data[0]!
-    const { cond: curCond, isNight: curIsNight } = conditionFromIcon(cur.weather[0]?.icon ?? '01d')
-
-    // First hourly entry's pop is the best proxy for current-hour rain probability
-    const rainPercent = Math.round((hourlyRes.data[0]?.pop ?? 0) * 100)
-
-    const aqi = aqiRes.list[0]?.main?.aqi ?? 1
-
-    // OWM's `alerts` field lists every concurrently active alert's UUID — a
-    // single location can have several (e.g. tornado + squall + thunderstorm
-    // watches at once), so all of them are fetched, not just the first.
+    // Canada-only for now. A small bbox around the point is enough to catch
+    // any alert zone the location falls within (alert polygons are large
+    // regional shapes), and the query is inherently empty outside Canada.
     let alertActive = false
     let alertText = 'None'
-    const alertDetails: WeatherAlertDetail[] = []
-    if (cur.alerts && cur.alerts.length > 0) {
-      const results = await Promise.allSettled(
-        cur.alerts.map(id => $fetch<{
-          sender_name: string
-          event: string
-          start: number
-          end: number
-          description?: Array<{ language: string; description: string }> | string
-        }>(`${OWM}/data/4.0/onecall/alert/${id}?appid=${key}`))
-      )
+    let alertDetails: WeatherAlertDetail[] = []
+    try {
+      const eps = 0.05
+      const bbox = `${Number(lon) - eps},${Number(lat) - eps},${Number(lon) + eps},${Number(lat) + eps}`
+      const alertsRes = await $fetch<GeoMetAlertsResponse>(`${GEOMET_ALERTS}?f=json&bbox=${bbox}`)
 
-      for (const result of results) {
-        if (result.status !== 'fulfilled') continue
-        const alert = result.value
-
-        // Some regional alert sources (e.g. Environment Canada) leave `event` empty;
-        // fall back to scanning the English description for type keywords.
-        const engDesc = Array.isArray(alert.description)
-          ? (alert.description.find(d => d.language.startsWith('en'))?.description ?? '')
-          : (typeof alert.description === 'string' ? alert.description : '')
-        const searchText = (alert.event + ' ' + engDesc).toLowerCase()
-
-        let label = 'Alert'
-        if (searchText.includes('tornado')) label = 'Tornado'
-        else if (searchText.includes('heat') || searchText.includes('humidex')) label = 'Heat'
-        else if (searchText.includes('thunder') || searchText.includes('storm')) label = 'Storm'
-        else if (searchText.includes('squall') || searchText.includes('wind') || searchText.includes('gale')) label = 'Wind'
-        else if (searchText.includes('flood')) label = 'Flood'
-        else if (searchText.includes('freeze') || searchText.includes('frost') || searchText.includes('snow')) label = 'Ice'
-        else label = alert.event.split(' ')[0] || 'Alert'
-
-        alertDetails.push({
-          event: alert.event || label,
-          senderName: alert.sender_name || 'Unknown source',
-          start: alert.start,
-          end: alert.end,
-          description: cleanAlertDescription(engDesc) || 'No further details available.',
-        })
-
-        // Indicator badge reflects the first successfully-resolved alert.
-        if (!alertActive) {
-          alertActive = true
-          alertText = label
-        }
-      }
-
-      // All lookups failed (e.g. transient OWM error) but alerts were reported active.
-      if (!alertActive) {
-        alertActive = true
-        alertText = 'Alert'
-      }
+      // status_en is CAP message lifecycle (issued/continued/ended), not a
+      // validity flag — an 'ended' (cancelled) alert can still carry a
+      // future expiration_datetime, so date-range filtering alone is unreliable.
+      const active = alertsRes.features.filter(f => f.properties.status_en !== 'ended')
+      alertActive = active.length > 0
+      alertText = active[0]?.properties.alert_short_name_en ?? 'None'
+      alertDetails = active.map(f => ({
+        event: f.properties.alert_name_en,
+        senderName: 'Environment Canada',
+        start: Math.round(Date.parse(f.properties.validity_datetime) / 1000),
+        end: Math.round(Date.parse(f.properties.expiration_datetime) / 1000),
+        description: cleanAlertDescription(f.properties.alert_text_en) || 'No further details available.',
+      }))
+    } catch (err) {
+      getLogger('weather').warn('weather.geomet_alerts_failed', {
+        requestId: event.context.requestId,
+        message: (err as Error)?.message,
+      })
     }
 
+    const cur = forecast.current
+    const curAqiFive = eaqiToFive(aqi.current.european_aqi)
+
     const current = {
-      temp: Math.round(cur.temp),
-      feelsLike: Math.round(cur.feels_like),
-      conditionCode: curCond,
-      isNight: curIsNight,
-      rain: rainPercent,
-      wind: Math.round(cur.wind_speed * 3.6), // m/s → km/h
-      windDir: windDir(cur.wind_deg),
-      humidity: cur.humidity,
-      aqi,
-      aqiLabel: aqiLabel(aqi),
+      temp: Math.round(cur.temperature_2m),
+      feelsLike: Math.round(cur.apparent_temperature),
+      conditionCode: conditionFromWMO(cur.weather_code),
+      isNight: cur.is_day === 0,
+      rain: Math.round(cur.precipitation_probability),
+      wind: Math.round(cur.wind_speed_10m),
+      windDir: windDir(cur.wind_direction_10m),
+      humidity: cur.relative_humidity_2m,
+      aqi: curAqiFive,
+      aqiLabel: aqiLabel(curAqiFive),
       alertActive,
       alertText,
       alertDetails,
     }
 
-    const hourly = hourlyRes.data.map((h, i) => {
-      const hourNum = localHour(h.dt, tzOffset)
-      const { cond, isNight } = h.weather?.[0]?.icon
-        ? conditionFromIcon(h.weather[0].icon)
-        : conditionFromClouds(h.clouds ?? 0, h.dt, cur.sunrise, cur.sunset)
-      return {
-        dt: h.dt,
-        label: i === 0 ? 'Now' : String(hourNum).padStart(2, '0'),
-        isNight,
-        temp: Math.round(h.temp),
-        feelsLike: Math.round(h.feels_like),
-        conditionCode: cond,
-        precip: Math.round(h.pop * 100),
-        wind: Math.round(h.wind_speed * 3.6), // m/s → km/h
-        windDir: windDirShort(h.wind_deg),
-        humidity: h.humidity,
-        aqi: nearestAqi(h.dt, aqiForecastRes.list),
-      }
+    // Open-Meteo's hourly array starts at local midnight, not "now" — find
+    // the current-hour index so hourly[0] is still "Now", matching the
+    // previous OWM-backed behaviour.
+    const hourlyDts = forecast.hourly.time.map(t => toUnixDt(t, tzOffset))
+    const nowUnix = Math.floor(Date.now() / 1000)
+    let nowIdx = 0
+    for (let i = 0; i < hourlyDts.length; i++) {
+      if (hourlyDts[i]! <= nowUnix) nowIdx = i
+      else break
+    }
+
+    const hourly = hourlyDts.slice(nowIdx, nowIdx + 24).map((dt, i) => {
+      const idx = nowIdx + i
+      const label = i === 0 ? 'Now' : String(localHour(dt, tzOffset)).padStart(2, '0')
+      return buildHourlyEntry(forecast.hourly, idx, dt, label, aqiDts, aqi.hourly.european_aqi)
     })
 
-    // 5-day forecast's 3h buckets give a more reliable per-day probability
-    // than OWM's own daily pop; group them into the location's local days.
-    const derivedDailyPop = deriveDailyPop(forecastRes.list, forecastTzOffset)
+    // Open-Meteo's hourly data already extends across the full forecast
+    // horizon, so the remaining entries beyond today double as the
+    // "future day clicked" detail view — at full hourly resolution, unlike
+    // OWM's old 3-hourly 5-day forecast this replaces.
+    const forecastArr = hourlyDts.slice(nowIdx + 24).map((dt, i) => {
+      const idx = nowIdx + 24 + i
+      const label = String(localHour(dt, tzOffset)).padStart(2, '0')
+      return buildHourlyEntry(forecast.hourly, idx, dt, label, aqiDts, aqi.hourly.european_aqi)
+    })
 
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const daily = dailyRes.data.slice(1, 8).map((d) => {
-      const { cond } = d.weather?.[0]?.icon
-        ? conditionFromIcon(d.weather[0].icon)
-        : conditionFromClouds(d.clouds ?? 0, d.dt, cur.sunrise, cur.sunset)
-      const derived = derivedDailyPop.get(localDateKey(d.dt, tzOffset))
+    const daily = forecast.daily.time.slice(1, 8).map((dateStr, i) => {
+      const idx = i + 1
+      const dt = toUnixDt(dateStr, tzOffset)
       return {
-        dt: d.dt,
-        dayLabel: dayNames[localDayOfWeek(d.dt, tzOffset)]!,
-        conditionCode: cond,
-        precip: derived ?? Math.round((d.pop ?? 0) * 100),
-        low: Math.round(d.temp.min),
-        high: Math.round(d.temp.max),
-        feelsLikeLow: Math.round(d.feels_like.night),
-        feelsLikeHigh: Math.round(d.feels_like.day),
+        dt,
+        dayLabel: dayNames[localDayOfWeek(dt, tzOffset)]!,
+        conditionCode: conditionFromWMO(forecast.daily.weather_code[idx]!),
+        precip: Math.round(forecast.daily.precipitation_probability_max[idx]!),
+        low: Math.round(forecast.daily.temperature_2m_min[idx]!),
+        high: Math.round(forecast.daily.temperature_2m_max[idx]!),
+        feelsLikeLow: Math.round(forecast.daily.apparent_temperature_min[idx]!),
+        feelsLikeHigh: Math.round(forecast.daily.apparent_temperature_max[idx]!),
       }
     })
 
-    const forecast = forecastRes.list.map(item => {
-      const hourNum = localHour(item.dt, forecastTzOffset)
-      const { cond, isNight } = item.weather?.[0]?.icon
-        ? conditionFromIcon(item.weather[0].icon)
-        : conditionFromClouds(item.clouds?.all ?? 0, item.dt, forecastRes.city.sunrise, forecastRes.city.sunset)
-      return {
-        dt: item.dt,
-        label: String(hourNum).padStart(2, '0'),
-        isNight,
-        temp: Math.round(item.main.temp),
-        feelsLike: Math.round(item.main.feels_like),
-        conditionCode: cond,
-        precip: Math.round(item.pop * 100),
-        wind: Math.round(item.wind.speed * 3.6), // m/s → km/h
-        windDir: windDirShort(item.wind.deg),
-        humidity: item.main.humidity,
-        aqi: nearestAqi(item.dt, aqiForecastRes.list),
-      }
-    })
-
-    return { current, hourly, forecast, daily }
+    return { current, hourly, forecast: forecastArr, daily }
   } catch (err: unknown) {
     const e = err as Record<string, any>
     // ofetch exposes status both as err.status (shortcut) and err.response.status
     const status: number | undefined = e?.status ?? e?.response?.status
-    // ofetch stores parsed response body in err.response._data
-    const owmMessage: string = e?.response?._data?.message ?? e?.data?.message ?? ''
+    // Open-Meteo error bodies are shaped { error: true, reason: string }
+    const reason: string = e?.response?._data?.reason ?? e?.data?.reason ?? ''
 
-    getLogger('weather').error('weather.owm_request_failed', {
+    getLogger('weather').error('weather.open_meteo_request_failed', {
       requestId: event.context.requestId,
       status,
-      owmMessage,
+      reason,
     })
 
-    if (status === 401) {
-      throw createError({
-        statusCode: 401,
-        message: owmMessage || 'Invalid API key or missing One Call API 4.0 subscription',
-      })
-    }
     if (status === 429) throw createError({ statusCode: 429, message: 'Rate limit exceeded — try again later' })
-    throw createError({ statusCode: 502, message: owmMessage || 'Weather service unavailable' })
+    throw createError({ statusCode: 502, message: reason || 'Weather service unavailable' })
   }
 })

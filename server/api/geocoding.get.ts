@@ -1,24 +1,27 @@
 import type { GeoLocation } from '~/types/weather'
 
-/** Raw shape returned by the OWM Geocoding API before we simplify it. */
-interface OWMGeoResult {
+/** Raw shape returned by Open-Meteo's Geocoding API before we simplify it. */
+interface OpenMeteoGeoResult {
   name: string
-  local_names?: Record<string, string>
-  lat: number
-  lon: number
+  latitude: number
+  longitude: number
   country: string
-  state?: string
+  admin1?: string
+  population?: number
+}
+
+interface OpenMeteoGeoResponse {
+  results?: OpenMeteoGeoResult[]
 }
 
 /**
- * Geocodes a city name using the OWM Geocoding API.
- * Returns up to 5 matches shaped as GeoLocation objects.
- * The API key is kept server-side and never exposed to the browser.
+ * Geocodes a city name using Open-Meteo's Geocoding API (free, keyless).
+ * Returns up to 5 matches shaped as GeoLocation objects, ranked by
+ * population so e.g. "Ottawa" surfaces the Ontario capital before smaller
+ * same-named US towns.
  */
 export default defineEventHandler(async (event): Promise<GeoLocation[]> => {
   enforceOrigin(event)
-
-  const config = useRuntimeConfig()
 
   // h3 v2 (Nuxt 3.16+) getQuery fails on relative URLs in dev; parse manually
   const rawUrl = event.node.req.url ?? ''
@@ -27,29 +30,25 @@ export default defineEventHandler(async (event): Promise<GeoLocation[]> => {
 
   if (!query) return []
 
-  const key = config.openWeatherApiKey
-  if (!key) throw createError({ statusCode: 500, message: 'API key not configured' })
-
   try {
-    const results = await $fetch<OWMGeoResult[]>(
-      `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(query)}&limit=5&appid=${key}`
+    const response = await $fetch<OpenMeteoGeoResponse>(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=en&format=json`
     )
 
-    return results.map((r) => ({
+    return (response.results ?? []).map((r) => ({
       name: r.name,
       country: r.country,
-      state: r.state,
-      lat: r.lat,
-      lon: r.lon,
+      state: r.admin1,
+      lat: r.latitude,
+      lon: r.longitude,
     }))
   } catch (err: unknown) {
     const e = err as Record<string, any>
     const status: number | undefined = e?.status ?? e?.response?.status
-    getLogger('geocoding').error('geocoding.owm_request_failed', {
+    getLogger('geocoding').error('geocoding.open_meteo_request_failed', {
       requestId: event.context.requestId,
       status,
     })
-    if (status === 401) throw createError({ statusCode: 401, message: 'Invalid API key' })
     throw createError({ statusCode: 502, message: 'Geocoding service unavailable' })
   }
 })
