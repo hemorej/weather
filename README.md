@@ -2,29 +2,23 @@
 
 [![Laravel Forge Site Deployment Status](https://img.shields.io/endpoint?url=https%3A%2F%2Fforge.laravel.com%2Fsite-badges%2F18defe55-bea2-4349-8655-0568668b7c0b&style=plastic)](https://forge.laravel.com/jerome-zpm/resilient-bird/3266687)
 
-A minimalist single-page weather app built with **Nuxt 3**, **Vue 3**, and **TypeScript**, powered by the [OpenWeatherMap One Call API 4.0](https://openweathermap.org/api/one-call-4).
+A minimalist single-page weather app built with **Nuxt 3**, **Vue 3**, and **TypeScript**, powered by [Open-Meteo](https://open-meteo.com/) (weather, air quality, geocoding) and [Environment Canada's MSC GeoMet API](https://eccc-msc.github.io/open-data/msc-geomet/readme_en/) (alerts) — all free and keyless.
 
 ## Features
 
 - Current conditions: temperature, rain probability, wind, humidity, air quality, alerts
 - Horizontally scrollable 24-hour forecast; background tint shifts to match the displayed hour's temperature
 - Vertically scrollable 7-day forecast with animated low→high temperature range bars
-- Inline city search with up to 5 geocoded suggestions
+- Inline city search with up to 5 geocoded suggestions, ranked by population
 - Last selected city persisted in `localStorage` across sessions
-- 10-minute client-side cache per location (matches OWM's data refresh interval)
+- 10-minute client-side cache per location
 - Metric units only (°C, km/h)
 - Fully responsive from mobile to desktop
 
 ## Requirements
 
 - **Node.js 20+** and **pnpm 11+**
-- An [OpenWeatherMap](https://openweathermap.org/) account with an API key subscribed to **One Call API 4.0**
-
-> One Call API 4.0 is a **paid** subscription, separate from the free tier.
-> Geocoding and Air Pollution endpoints are included on all plans.
-> Subscribe at https://openweathermap.org/api/one-call-4
-
-New API keys can take **up to 2 hours** to activate.
+- No API keys or accounts — every upstream API used is free and keyless
 
 ## Development setup
 
@@ -32,11 +26,7 @@ New API keys can take **up to 2 hours** to activate.
 # 1. Install dependencies
 pnpm install
 
-# 2. Create your local env file
-cp .env.template .env
-# Edit .env and set OPENWEATHER_API_KEY=<your key>
-
-# 3. Start the dev server
+# 2. Start the dev server
 pnpm dev
 # → http://localhost:3000
 ```
@@ -51,26 +41,10 @@ pnpm build
 
 The output is a Node.js server in `.output/`.
 
-### Environment variable — important distinction
-
-`nuxt.config.ts` reads `OPENWEATHER_API_KEY` via `process.env` **at build time**.
-This means there are two valid approaches:
-
-| Approach | How it works | When to use |
-|---|---|---|
-| `OPENWEATHER_API_KEY` | Read at build time, embedded in the output | Build environments that inject secrets (Vercel, Railway, CI) |
-| `NUXT_OPEN_WEATHER_API_KEY` | Read at runtime by the Nuxt server, overrides the build-time value | Self-hosted servers where you want to rotate the key without rebuilding |
-
-On most platforms (Vercel, Railway, Render, Fly.io) you set env vars in the dashboard and the build picks them up automatically via `OPENWEATHER_API_KEY`. For self-hosted Node.js deployments where you start the server separately from the build, prefer `NUXT_OPEN_WEATHER_API_KEY`.
-
 ### Run the production server
 
 ```bash
-# With the key set at build time (already embedded):
 node .output/server/index.mjs
-
-# With runtime key injection:
-NUXT_OPEN_WEATHER_API_KEY=your_key node .output/server/index.mjs
 ```
 
 The server listens on port **3000** by default. Set `PORT` to override.
@@ -80,7 +54,6 @@ The server listens on port **3000** by default. Set `PORT` to override.
 ```bash
 pnpm add -g vercel
 vercel
-# Set OPENWEATHER_API_KEY in the Vercel dashboard → Settings → Environment Variables
 ```
 
 ### Deploy to a VPS / Docker
@@ -90,7 +63,6 @@ FROM node:20-alpine
 WORKDIR /app
 COPY .output .output
 EXPOSE 3000
-ENV NUXT_OPEN_WEATHER_API_KEY=""
 CMD ["node", ".output/server/index.mjs"]
 ```
 
@@ -99,8 +71,8 @@ CMD ["node", ".output/server/index.mjs"]
 ```
 weather-app/
 ├── server/api/
-│   ├── weather.get.ts      # Aggregates 5 OWM endpoints; shapes response into WeatherData
-│   └── geocoding.get.ts    # Proxies OWM Geocoding API; returns up to 5 GeoLocation results
+│   ├── weather.get.ts      # Aggregates Open-Meteo forecast/AQI + ECCC alerts; shapes response into WeatherData
+│   └── geocoding.get.ts    # Proxies Open-Meteo Geocoding API; returns up to 5 GeoLocation results
 ├── composables/
 │   ├── useWeather.ts       # localStorage cache (10-min TTL) + location persistence
 │   ├── useGeocoding.ts     # City search composable
@@ -117,20 +89,18 @@ weather-app/
 
 ## API endpoints used
 
-| Purpose | Endpoint | Plan |
+| Purpose | Endpoint | Auth |
 |---|---|---|
-| Current weather | `GET /data/4.0/onecall/current` | Paid (One Call 4.0) |
-| Hourly forecast (up to 24 h) | `GET /data/4.0/onecall/timeline/1h` | Paid (One Call 4.0) |
-| Daily forecast (7 days) | `GET /data/4.0/onecall/timeline/1day` | Paid (One Call 4.0) |
-| Alert details (when active) | `GET /data/4.0/onecall/alert/{id}` | Paid (One Call 4.0) |
-| Air quality / AQI | `GET /data/2.5/air_pollution` | Free |
-| City geocoding | `GET /geo/1.0/direct` | Free |
+| Current + hourly + daily forecast | `GET api.open-meteo.com/v1/forecast` | None |
+| Air quality (European AQI) | `GET air-quality-api.open-meteo.com/v1/air-quality` | None |
+| Weather alerts (Canada only) | `GET api.weather.gc.ca/collections/weather-alerts/items` | None |
+| City geocoding | `GET geocoding-api.open-meteo.com/v1/search` | None |
 
-AQI is derived from the PM2.5 concentration using EPA linear breakpoints, giving a 0–200 scale with Good / Moderate / Poor labels.
+AQI uses the EEA's European Air Quality Index, bucketed to a 1–5 Good…Very Poor scale.
 
 ## Caching
 
-OWM recommends refreshing no more often than every 10 minutes. This app stores each location's response in `localStorage` with a matching TTL. On page load:
+This app stores each location's weather response in `localStorage` with a 10-minute TTL. On page load:
 
 1. If a fresh cache entry exists for the saved location → data is shown immediately, no API call.
-2. If the cache is expired or missing → four parallel API calls are made, the result is cached.
+2. If the cache is expired or missing → the weather/AQI/alerts calls are made, the result is cached.

@@ -1,10 +1,6 @@
 export default defineNuxtConfig({
   devtools: { enabled: true },
 
-  runtimeConfig: {
-    openWeatherApiKey: process.env.OPENWEATHER_API_KEY ?? '',
-  },
-
   app: {
     head: {
       title: 'Weather',
