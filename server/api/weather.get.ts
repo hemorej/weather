@@ -39,7 +39,7 @@ interface OWMDailyData {
   // OWM has no min/max equivalent for feels_like — day/night stand in as the
   // closest approximation of a daily high/low when toggled.
   feels_like: { day: number; night: number; eve: number; morn: number }
-  pop: number         // probability of precipitation, 0–1
+  pop: number | null  // OWM's daily pop has proven unreliable; see deriveDailyPop
   clouds?: number
   weather?: OWMWeather[]
 }
@@ -127,6 +127,33 @@ function localHour(dt: number, offsetSeconds: number): number {
 
 function localDayOfWeek(dt: number, offsetSeconds: number): number {
   return new Date((dt + offsetSeconds) * 1000).getUTCDay()
+}
+
+function localDateKey(dt: number, offsetSeconds: number): string {
+  return new Date((dt + offsetSeconds) * 1000).toISOString().slice(0, 10)
+}
+
+/**
+ * OWM's daily `pop` (from the One Call `timeline/1day` endpoint) has been
+ * observed to disagree sharply with its own 3h-interval forecast — e.g.
+ * reporting 95% for a day whose 3h buckets all show 0%. Derive a per-day
+ * probability from the 3h-interval 5-day forecast instead: treating each
+ * bucket's pop as an independent chance of rain, the probability of rain at
+ * some point in the day is 1 minus the chance it stays dry all day.
+ */
+function deriveDailyPop(items: Array<{ dt: number; pop: number }>, offsetSeconds: number): Map<string, number> {
+  const byDay = new Map<string, number[]>()
+  for (const item of items) {
+    const key = localDateKey(item.dt, offsetSeconds)
+    if (!byDay.has(key)) byDay.set(key, [])
+    byDay.get(key)!.push(item.pop)
+  }
+  const result = new Map<string, number>()
+  for (const [key, pops] of byDay) {
+    const probDry = pops.reduce((acc, p) => acc * (1 - p), 1)
+    result.set(key, Math.round((1 - probDry) * 100))
+  }
+  return result
 }
 
 /**
@@ -315,16 +342,21 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
       }
     })
 
+    // 5-day forecast's 3h buckets give a more reliable per-day probability
+    // than OWM's own daily pop; group them into the location's local days.
+    const derivedDailyPop = deriveDailyPop(forecastRes.list, forecastTzOffset)
+
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
     const daily = dailyRes.data.slice(1, 8).map((d) => {
       const { cond } = d.weather?.[0]?.icon
         ? conditionFromIcon(d.weather[0].icon)
         : conditionFromClouds(d.clouds ?? 0, d.dt, cur.sunrise, cur.sunset)
+      const derived = derivedDailyPop.get(localDateKey(d.dt, tzOffset))
       return {
         dt: d.dt,
         dayLabel: dayNames[localDayOfWeek(d.dt, tzOffset)]!,
         conditionCode: cond,
-        precip: Math.round(d.pop * 100),
+        precip: derived ?? Math.round((d.pop ?? 0) * 100),
         low: Math.round(d.temp.min),
         high: Math.round(d.temp.max),
         feelsLikeLow: Math.round(d.feels_like.night),
