@@ -1,4 +1,4 @@
-import type { WeatherData, WeatherHourly, WeatherAlertDetail } from '~/types/weather'
+import type { AlertSeverity, WeatherData, WeatherHourly, WeatherAlertDetail } from '~/types/weather'
 
 const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast'
 const OPEN_METEO_AQI = 'https://air-quality-api.open-meteo.com/v1/air-quality'
@@ -58,6 +58,7 @@ interface GeoMetAlertFeature {
     alert_name_en: string
     alert_short_name_en: string
     alert_text_en: string
+    risk_colour_en: string  // ECCC severity palette: 'yellow' | 'orange' | 'red' (occasionally other strings)
     status_en: string   // 'issued' | 'continued' | 'ended' — CAP message lifecycle, not a validity flag
     validity_datetime: string
     expiration_datetime: string
@@ -163,10 +164,31 @@ function nearestAqi(dt: number, times: number[], values: number[]): number {
  * Some regional alert sources (e.g. Environment Canada) use a "###" line to
  * separate the actual hazard description from boilerplate reporting/
  * monitoring instructions repeated on every alert. Drop everything from the
- * first "###" onward so only the hazard-specific prose remains.
+ * first "###" onward so only the hazard-specific prose remains, then also
+ * strip the "Please continue to monitor alerts…" paragraph, which ECCC often
+ * repeats inside the body (before the "###") as well.
  */
 function cleanAlertDescription(text: string): string {
-  return text.split(/^\s*#+\s*$/m)[0]!.trim()
+  return text
+    .split(/^\s*#+\s*$/m)[0]!
+    .replace(/^\s*Please continue to monitor.*(\n(?!\n).*)*/gim, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+const SEVERITY_RANK: Record<AlertSeverity, number> = { moderate: 0, severe: 1, extreme: 2 }
+
+/**
+ * Map ECCC's risk_colour_en to the app's 3-level severity scale. Orange (the
+ * common "warning" colour) and anything unrecognised fall through to 'severe',
+ * matching the single accent the UI used before severity was wired in.
+ */
+function severityFromRiskColour(colour: string | undefined): AlertSeverity {
+  switch (colour?.toLowerCase()) {
+    case 'yellow': return 'moderate'
+    case 'red':    return 'extreme'
+    default:       return 'severe'
+  }
 }
 
 /** Shapes one Open-Meteo hourly array index into the app's WeatherHourly record. */
@@ -236,6 +258,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     // regional shapes), and the query is inherently empty outside Canada.
     let alertActive = false
     let alertText = 'None'
+    let alertSeverity: AlertSeverity = 'severe'
     let alertDetails: WeatherAlertDetail[] = []
     try {
       const eps = 0.05
@@ -251,10 +274,15 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
       alertDetails = active.map(f => ({
         event: f.properties.alert_name_en,
         senderName: 'Environment Canada',
+        severity: severityFromRiskColour(f.properties.risk_colour_en),
         start: Math.round(Date.parse(f.properties.validity_datetime) / 1000),
         end: Math.round(Date.parse(f.properties.expiration_datetime) / 1000),
         description: cleanAlertDescription(f.properties.alert_text_en) || 'No further details available.',
       }))
+      alertSeverity = alertDetails.reduce<AlertSeverity>(
+        (worst, d) => (SEVERITY_RANK[d.severity] > SEVERITY_RANK[worst] ? d.severity : worst),
+        'moderate',
+      )
     } catch (err) {
       getLogger('weather').warn('weather.geomet_alerts_failed', {
         requestId: event.context.requestId,
@@ -278,6 +306,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
       aqiLabel: aqiLabel(curAqiFive),
       alertActive,
       alertText,
+      alertSeverity,
       alertDetails,
     }
 

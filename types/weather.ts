@@ -19,12 +19,17 @@ export interface WeatherCurrent {
   aqiLabel: string   // 'Good' | 'Fair' | 'Moderate' | 'Poor' | 'Very Poor'
   alertActive: boolean
   alertText: string  // 'None' or the alert's short name (from Environment Canada)
+  alertSeverity: AlertSeverity  // highest severity among the active alerts (don't-care when !alertActive)
   alertDetails: WeatherAlertDetail[]  // all concurrently active alerts, not just the first
 }
+
+// Normalised from Environment Canada's risk_colour_en (yellow / orange / red).
+export type AlertSeverity = 'moderate' | 'severe' | 'extreme'
 
 export interface WeatherAlertDetail {
   event: string
   senderName: string
+  severity: AlertSeverity
   start: number        // unix timestamp (seconds UTC)
   end: number          // unix timestamp (seconds UTC)
   description: string

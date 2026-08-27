@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GeoLocation, WeatherData, WeatherDaily, WeatherHourly } from '~/types/weather'
+import type { AlertSeverity, GeoLocation, WeatherData, WeatherDaily, WeatherHourly } from '~/types/weather'
 import { useWeatherCache, useLocationStorage, fetchWeatherData } from '~/composables/useWeather'
 import { useGeocoding } from '~/composables/useGeocoding'
 import { useTemperatureColor } from '~/composables/useTemperatureColor'
@@ -71,6 +71,32 @@ const dateStr = computed(() => {
 })
 
 // ── Indicator row ─────────────────────────────────────────────────────────────
+
+// Pick a hazard-typed icon from the alert's short name (e.g. "Severe
+// thunderstorm", "Blizzard", "Freezing rain"). Falls back to the generic
+// warning triangle for anything unrecognised.
+function alertIcon(text: string): string {
+  const t = text.toLowerCase()
+  if (/thunder|tornado/.test(t))                              return 'storm'
+  if (/blizzard|snow|winter storm|flurr|freez|frost|ice|arctic|cold|wind chill/.test(t)) return 'snow'
+  if (/rain|flood/.test(t))                                   return 'rain'
+  if (/wind|gale|squall|suetes|outflow/.test(t))              return 'wind'
+  if (/fog/.test(t))                                          return 'fog'
+  if (/heat|hot|humidex/.test(t))                             return 'sun'
+  return 'alert'
+}
+
+// CSS custom property that tints the alert icon, label and overlay by the
+// alert's ECCC severity (yellow / orange / red → moderate / severe / extreme).
+const ALERT_ACCENT: Record<AlertSeverity, string> = {
+  moderate: 'var(--accent-alert-moderate)',
+  severe:   'var(--accent-alert)',
+  extreme:  'var(--accent-alert-extreme)',
+}
+const alertAccentColor = computed(
+  () => ALERT_ACCENT[weatherData.value?.current.alertSeverity ?? 'severe'],
+)
+
 const indicators = computed(() => {
   if (!weatherData.value) return []
   const c = weatherData.value.current
@@ -79,7 +105,11 @@ const indicators = computed(() => {
     { key: 'wind',     icon: 'wind',     value: `${c.wind} km/h`,  label: `Wind · ${c.windDir}`, accent: false },
     { key: 'humidity', icon: 'humidity', value: `${c.humidity}%`,   label: 'Humidity',  accent: false },
     { key: 'aqi',      icon: 'leaf',     value: String(c.aqi),      label: c.aqiLabel,  accent: false },
-    ...(c.alertActive ? [{ key: 'alert', icon: 'alert', value: c.alertText, label: 'Alert', accent: true }] : []),
+    // Inline cell just flags that an alert exists (hazard-typed icon + red
+    // "ALERT" label, no value line); the event name + full text live in the
+    // tap-to-open overlay. Showing c.alertText here overflows the 1/5-width
+    // column and shoves the neighbouring metric around.
+    ...(c.alertActive ? [{ key: 'alert', icon: alertIcon(c.alertText), value: null, label: 'Alert', accent: true }] : []),
   ]
 })
 
@@ -405,11 +435,13 @@ onMounted(() => {
             style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"
             @click="ind.key === 'alert' ? (showAlert = true) : selectMetric(ind.key)"
           >
-            <WeatherIcon :name="ind.icon" :size="18" :style="{ color: ind.key === selectedMetric ? 'var(--fg-secondary)' : 'var(--fg-faint)' }" />
-            <div :style="{ fontSize: '14px', fontWeight: 600, color: ind.accent ? 'var(--accent-alert)' : 'var(--fg-secondary)', lineHeight: 1 }">
+            <WeatherIcon :name="ind.icon" :size="18" :style="{ color: ind.accent ? alertAccentColor : (ind.key === selectedMetric ? 'var(--fg-secondary)' : 'var(--fg-faint)') }" />
+            <div v-if="ind.value != null" :style="{ fontSize: '14px', fontWeight: 600, color: 'var(--fg-secondary)', lineHeight: 1 }">
               {{ ind.value }}
             </div>
-            <div style="font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--fg-muted);">
+            <!-- keep the label baseline aligned with the value-bearing cells -->
+            <div v-else aria-hidden="true" style="height:14px;"></div>
+            <div :style="{ fontSize: '10px', fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: ind.accent ? alertAccentColor : 'var(--fg-muted)' }">
               {{ ind.label }}
             </div>
           </div>
@@ -508,10 +540,10 @@ onMounted(() => {
         class="alert-overlay"
         @click.self="showAlert = false"
       >
-        <div class="alert-card">
+        <div class="alert-card" :style="{ '--alert-accent': alertAccentColor }">
           <button class="alert-close" aria-label="Close" @click="showAlert = false">✕</button>
           <div class="alert-card__header">
-            <WeatherIcon name="alert" :size="20" style="color:var(--accent-alert);" />
+            <WeatherIcon name="alert" :size="20" style="color:var(--alert-accent);" />
             <span class="alert-card__title">
               {{ weatherData.current.alertDetails.length > 1 ? `${weatherData.current.alertDetails.length} Active Alerts` : weatherData.current.alertDetails[0]!.event }}
             </span>
@@ -588,7 +620,9 @@ onMounted(() => {
   --fg-hour-label: #8a8a8a;
   --fg-winddir: #c2c2c2;
   --fg-empty: #c0c0c0;
-  --accent-alert: #c2410c;
+  --accent-alert-moderate: #b45309;  /* ECCC yellow  — advisory / special statement */
+  --accent-alert: #c2410c;           /* ECCC orange  — watch / warning (default) */
+  --accent-alert-extreme: #b91c1c;   /* ECCC red     — severe / extreme warning */
   --accent-rain: #6aa0d4;
   --accent-humidity: #4ba69a;
   --border-row: #f4f4f4;
@@ -626,7 +660,9 @@ onMounted(() => {
   --fg-hour-label: #8a959d;
   --fg-winddir: #5c686f;
   --fg-empty: #5c686f;
+  --accent-alert-moderate: #d9a441;
   --accent-alert: #e2643a;
+  --accent-alert-extreme: #f2564a;
   --accent-rain: #7cb0e0;
   --accent-humidity: #5cb8ab;
   --border-row: rgba(255, 255, 255, 0.06);
@@ -813,7 +849,7 @@ onMounted(() => {
   margin-top: 10px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent-alert);
+  color: var(--alert-accent, var(--accent-alert));
 }
 .alert-card__sender {
   margin-top: 4px;

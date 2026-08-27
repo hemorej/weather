@@ -79,6 +79,14 @@ withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 })
       <path d="M12.6 14l-2.3 3.5h2.5L11 21.2l4.1-4.4h-2.4L13.9 14Z" />
     </template>
 
+    <!-- snow -->
+    <template v-else-if="name === 'snow'">
+      <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
+      <circle cx="9"    cy="19"   r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="12.5" cy="20.4" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="16"   cy="19"   r="0.6" fill="currentColor" stroke="none" />
+    </template>
+
     <!-- fog / mist -->
     <template v-else-if="name === 'fog'">
       <path d="M7 13.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 4.7 3.8 3.8 0 0 1 17 13.5H7Z" />
