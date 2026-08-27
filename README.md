@@ -2,7 +2,7 @@
 
 [![Laravel Forge Site Deployment Status](https://img.shields.io/endpoint?url=https%3A%2F%2Fforge.laravel.com%2Fsite-badges%2F18defe55-bea2-4349-8655-0568668b7c0b&style=plastic)](https://forge.laravel.com/jerome-zpm/resilient-bird/3266687)
 
-A minimalist single-page weather app built with **Nuxt 3**, **Vue 3**, and **TypeScript**, powered by [Open-Meteo](https://open-meteo.com/) (weather, air quality, geocoding) and [Environment Canada's MSC GeoMet API](https://eccc-msc.github.io/open-data/msc-geomet/readme_en/) (alerts) — all free and keyless.
+A minimalist single-page weather app built with **Nuxt 4**, **Vue 3**, and **TypeScript**, powered by [Open-Meteo](https://open-meteo.com/) (weather, air quality, geocoding) and [Environment Canada's MSC GeoMet API](https://eccc-msc.github.io/open-data/msc-geomet/readme_en/) (alerts) — all free and keyless.
 
 ## Features
 
@@ -76,7 +76,8 @@ weather-app/
 ├── composables/
 │   ├── useWeather.ts       # localStorage cache (10-min TTL) + location persistence
 │   ├── useGeocoding.ts     # City search composable
-│   └── useTemperatureColor.ts  # Temperature → hue mapping for tint and range bars
+│   ├── useTemperatureColor.ts  # Temperature → hue mapping for tint and range bars
+│   └── useDarkMode.ts      # Auto dark mode: prefers-color-scheme, 7pm–6am fallback
 ├── components/
 │   ├── WeatherApp.vue      # Main UI: header, hourly strip, 7-day list, city search
 │   └── WeatherIcon.vue     # Inline SVG icon set (weather conditions + indicators)

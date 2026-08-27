@@ -4,7 +4,8 @@ import type { H3Event } from 'h3'
  * Sites allowed to call our API routes. Not a security boundary — Origin and
  * Referer are ordinary headers a non-browser client can set to anything —
  * but it blocks the common case of another site's JS or a lazy scraper
- * hitting these routes directly and spending a billed OWM request.
+ * hitting these routes directly and burning our share of Open-Meteo's free
+ * rate limit (or getting the deploy IP throttled).
  */
 const ALLOWED_ORIGINS = [
   'https://weather.jerome-arfouche.ca',

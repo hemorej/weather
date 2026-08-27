@@ -142,9 +142,10 @@ function condIconName(cond: string, isNight: boolean): string {
   return cond
 }
 
-// The daily conditionCode comes from OWM's own icon pick, which can disagree
-// with OWM's own rain probability (e.g. "cloudy" on a day that's 100%
-// likely to rain). Above the threshold, force the rain icon so they agree.
+// The daily conditionCode is derived from Open-Meteo's WMO weather_code, which
+// can disagree with its own precipitation_probability_max (e.g. "cloudy" on a
+// day that's 100% likely to rain). Above the threshold, force the rain icon so
+// the icon and the percentage agree.
 function dailyIconName(d: WeatherDaily): string {
   if (d.precip >= 50 && d.conditionCode !== 'storm') return 'rain'
   return condIconName(d.conditionCode, false)

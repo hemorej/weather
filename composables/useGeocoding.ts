@@ -6,7 +6,8 @@ import type { GeoLocation } from '~/types/weather'
  */
 export function useGeocoding() {
   /**
-   * Search for cities matching `query` via the OWM Geocoding API.
+   * Search for cities matching `query` via the server's /api/geocoding route
+   * (backed by Open-Meteo's keyless Geocoding API).
    * Returns up to 5 results, or an empty array when the query is blank.
    * Throws on network/API errors — callers should catch.
    */

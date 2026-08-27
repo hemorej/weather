@@ -15,10 +15,10 @@ export interface WeatherCurrent {
   wind: number       // km/h
   windDir: string
   humidity: number   // %
-  aqi: number        // OWM's fixed 1-5 index (1 = Good … 5 = Very Poor)
+  aqi: number        // 1-5 badge scale derived from Open-Meteo's European AQI (1 = Good … 5 = Very Poor); see eaqiToFive() in server/api/weather.get.ts
   aqiLabel: string   // 'Good' | 'Fair' | 'Moderate' | 'Poor' | 'Very Poor'
   alertActive: boolean
-  alertText: string  // 'None' | 'Heat' | 'Storm' | etc.
+  alertText: string  // 'None' or the alert's short name (from Environment Canada)
   alertDetails: WeatherAlertDetail[]  // all concurrently active alerts, not just the first
 }
 
@@ -41,7 +41,7 @@ export interface WeatherHourly {
   wind: number       // km/h
   windDir: string    // 8-point compass, lowercase (e.g. 'w', 'ne')
   humidity: number   // %
-  aqi: number        // OWM's fixed 1-5 index (1 = Good … 5 = Very Poor), nearest hourly forecast match
+  aqi: number        // 1-5 badge scale (see WeatherCurrent.aqi), matched to the nearest hourly air-quality reading
 }
 
 export interface WeatherDaily {
@@ -51,17 +51,16 @@ export interface WeatherDaily {
   precip: number
   low: number
   high: number
-  // OWM has no feels_like min/max for the day; day/night stand in as the
-  // closest approximation of a "feels like" high/low.
+  // From Open-Meteo's daily apparent_temperature_min / _max.
   feelsLikeLow: number
   feelsLikeHigh: number
 }
 
 export interface WeatherData {
   current: WeatherCurrent
-  hourly: WeatherHourly[]     // 1-hour intervals, next 24 h (One Call 4.0)
-  forecast: WeatherHourly[]   // 3-hour intervals, next 5 days (Forecast 5 API)
-  daily: WeatherDaily[]
+  hourly: WeatherHourly[]     // 1-hour intervals, next 24 h
+  forecast: WeatherHourly[]   // 1-hour intervals beyond the first 24 h (same Open-Meteo hourly series); backs the "future day clicked" view
+  daily: WeatherDaily[]       // next 7 days
 }
 
 export interface WeatherCache {

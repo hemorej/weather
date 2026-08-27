@@ -1,8 +1,8 @@
 import type { WeatherData, GeoLocation, WeatherCache } from '~/types/weather'
 
 /**
- * OWM data refreshes every 10 minutes — matching that interval avoids wasted
- * API calls on every page load while keeping the displayed data current.
+ * Open-Meteo updates its models roughly every 15 minutes; a 10-minute client
+ * cache avoids re-fetching on every page load while keeping data current.
  */
 const CACHE_TTL = 10 * 60 * 1000
 const LOCATION_KEY = 'weather_location'
@@ -73,7 +73,10 @@ export function useLocationStorage() {
   return { load, save }
 }
 
-/** Calls the Nuxt server route that proxies the OWM One Call API 4.0. */
+/**
+ * Calls the Nuxt server route that aggregates Open-Meteo (forecast + air
+ * quality) and Environment Canada alerts into the app's WeatherData shape.
+ */
 export async function fetchWeatherData(loc: GeoLocation): Promise<WeatherData> {
   return $fetch<WeatherData>('/api/weather', {
     params: { lat: loc.lat, lon: loc.lon },
