@@ -10,14 +10,12 @@
     "typecheck": "vue-tsc --noEmit",
     "postinstall": "nuxt prepare"
   },
-  "dependencies": {
-    "nuxt": "^4.6.1",
-    "tslog": "^5.2.0",
-    "vue": "^3.5.43"
-  },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "nuxt": "^4.6.1",
+    "tslog": "^5.2.0",
     "typescript": "^5.5.0",
+    "vue": "^3.5.43",
     "vue-tsc": "^3.3.13"
   },
   "packageManager": "pnpm@11.9.0"
