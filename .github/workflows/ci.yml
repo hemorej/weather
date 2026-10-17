@@ -43,3 +43,22 @@ jobs:
 
       - name: Verify npm registry signatures
         run: pnpm audit signatures
+
+  # Deploys only after `build` passes, and only for pushes to main (never PRs).
+  # Quick Deploy is off in Forge; this calls the site's Deployment Trigger URL,
+  # which just makes Forge deploy its configured branch. The URL lives in the
+  # `production` Environment (restricted to main), not in repo-level secrets.
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions: {}
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: Trigger Forge deployment
+        env:
+          FORGE_DEPLOY_URL: ${{ secrets.FORGE_DEPLOY_URL }}
+        run: curl -fsS --max-time 30 "$FORGE_DEPLOY_URL" > /dev/null
