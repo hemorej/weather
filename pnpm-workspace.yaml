@@ -19,9 +19,15 @@ minimumReleaseAge: 4320
 overrides:
   undici: '^8.10.2'
   svgo: '^4.1.0'
-  devalue: '^5.9.2'
   source-map-js: '^1.2.2'
   shell-quote: '^1.11.0'
   '@nuxt/devtools': '-'
   '@vitejs/devtools': '-'
   '@vitejs/devtools-kit': '-'
+
+# Build/dev-time only transitive deps of nuxt > nitropack (listhen dev server,
+# globby file matching); neither ships in .output. Remove once patched upstream.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-86w9-cpqp-85rv # node-forge
+    - GHSA-vfj7-8cjw-p6xm # braces
