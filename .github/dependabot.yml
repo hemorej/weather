@@ -5,3 +5,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Merges to main trigger a deploy, so batch routine bumps into one PR.
+    # Major bumps stay individual.
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
