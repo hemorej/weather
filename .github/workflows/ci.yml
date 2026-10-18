@@ -1,24 +1,21 @@
 name: CI
 
-# Frozen-lockfile install so CI can never silently re-resolve dependency
-# versions outside what's checked into pnpm-lock.yaml (and outside the
-# minimumReleaseAge window enforced in pnpm-workspace.yaml). Also runs
-# pnpm audit (known vulnerabilities) and audit signatures (npm registry
-# provenance) on every PR and push to main.
+# Gate for deploys: tests and typechecks only. Dependency audits run
+# separately (audit.yml) so a newly disclosed advisory can't block an
+# unrelated deploy. Frozen-lockfile install so CI can never silently
+# re-resolve versions outside what's in pnpm-lock.yaml.
 on:
   push:
     branches: [main]
   pull_request:
 
 jobs:
-  build:
+  checks:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
@@ -35,21 +32,12 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
-      - name: Build
-        run: pnpm build
-
-      - name: Audit for known vulnerabilities
-        run: pnpm audit --audit-level=high
-
-      - name: Verify npm registry signatures
-        run: pnpm audit signatures
-
-  # Deploys only after `build` passes, and only for pushes to main (never PRs).
+  # Deploys only after `checks` passes, and only for pushes to main (never PRs).
   # Quick Deploy is off in Forge; this calls the site's Deployment Trigger URL,
   # which just makes Forge deploy its configured branch. The URL lives in the
   # `production` Environment (restricted to main), not in repo-level secrets.
   deploy:
-    needs: build
+    needs: checks
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
@@ -74,3 +62,23 @@ jobs:
             --data-urlencode "forge_deploy_author=$COMMIT_AUTHOR" \
             --data-urlencode "forge_deploy_message=${COMMIT_MESSAGE%%$'\n'*}" \
             > /dev/null
+
+      # The trigger returns as soon as Forge accepts the request; the deploy
+      # itself runs async. Give it time to finish, then require the site to
+      # answer 2xx (following redirects) so a failed restart turns this red.
+      # Only proves the site is up, not that the new commit is live.
+      - name: Verify site is up
+        env:
+          SITE_URL: https://weather.jerome-arfouche.ca/
+        run: |
+          sleep 60
+          for attempt in $(seq 1 12); do
+            if curl -fsSL --max-time 10 -o /dev/null "$SITE_URL"; then
+              echo "$SITE_URL is up (attempt $attempt)"
+              exit 0
+            fi
+            echo "attempt $attempt failed, retrying in 15s"
+            sleep 15
+          done
+          echo "::error::$SITE_URL did not respond with 2xx after deploy"
+          exit 1
