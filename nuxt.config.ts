@@ -1,6 +1,25 @@
 export default defineNuxtConfig({
   devtools: { enabled: false },
 
+  modules: ['@sentry/nuxt/module'],
+
+  // Sentry runtime init lives in sentry.{client,server}.config.ts and is a no-op
+  // unless SENTRY_DSN is set. Sourcemaps are only generated + uploaded when
+  // SENTRY_AUTH_TOKEN is present at build time.
+  sentry: {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+    sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  },
+  sourcemap: { client: process.env.SENTRY_AUTH_TOKEN ? 'hidden' : false },
+
+  // The DSN is write-only by design; the browser SDK needs it.
+  // Override at runtime with NUXT_PUBLIC_SENTRY_DSN.
+  runtimeConfig: {
+    public: { sentry: { dsn: process.env.SENTRY_DSN } },
+  },
+
   app: {
     head: {
       title: 'Weather',
@@ -24,6 +43,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/global.css'],
 
   nitro: {
+    sourceMap: process.env.NODE_ENV !== 'production' || Boolean(process.env.SENTRY_AUTH_TOKEN),
     compressPublicAssets: true,
     routeRules: {
       '/_nuxt/**': { headers: { 'cache-control': 'public, max-age=31536000, immutable' } },
