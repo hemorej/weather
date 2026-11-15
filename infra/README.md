@@ -23,7 +23,7 @@ everything specific to this app. Facts as of 2026-10-23.
 | `forge_deploy.sh` | The deploy script — identical to the one in Forge's *Deploy Script* box | Keep the two in step by hand (it isn't on the server, so `snapshot.sh` can't check it) |
 | `nginx.conf` | The vhost (`/etc/nginx/sites-available/weather.jerome-arfouche.ca`) | By hand; `./snapshot.sh` flags drift |
 | `supervisord.conf` | The Nitro daemon (`/etc/supervisor/conf.d/daemon-916152.conf`) | Created by Forge's *Daemons* page; `./snapshot.sh` flags drift |
-| `forge-conf/` | Forge-generated includes, read-only reference. `site.conf` holds the `proxy_pass http://0.0.0.0:9000`, headers and the `.`-file deny rule | Refreshed by `./snapshot.sh` |
+| `forge-conf/` | Forge-generated includes, read-only reference. `site.conf` holds the `proxy_pass http://0.0.0.0:9000`, headers and the `.`-file deny rule | Refreshed by `./snapshot.sh` — except `before/ssl_redirect.conf`, hand-edited to `include snippets/http-redirect.conf` (bot rules before the 80 → 443 redirect), so it is a `check` file: Forge may regenerate it, re-apply if `./snapshot.sh` shows DRIFT |
 | `env.example` | Names of the variables in the server-side `.env` | — |
 | `manifest`, `snapshot.sh` | What to compare with the server, and the script | `./snapshot.sh` |
 
