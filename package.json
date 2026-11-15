@@ -11,6 +11,7 @@
     "postinstall": "nuxt prepare"
   },
   "devDependencies": {
+    "@sentry/nuxt": "^11.12.0",
     "@types/node": "^26.6.5",
     "nuxt": "^4.6.2",
     "tslog": "^5.2.0",
