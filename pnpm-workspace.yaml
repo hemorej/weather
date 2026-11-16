@@ -17,10 +17,7 @@ minimumReleaseAge: 4320
 # Security overrides for transitive deps flagged by Dependabot.
 # Remove once nuxt pulls in patched versions.
 overrides:
-  undici: '^8.10.2'
-  svgo: '^4.1.0'
   source-map-js: '^1.2.2'
-  shell-quote: '^1.11.0'
   '@nuxt/devtools': '-'
   '@vitejs/devtools': '-'
   '@vitejs/devtools-kit': '-'
