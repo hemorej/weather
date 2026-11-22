@@ -10,6 +10,7 @@ overrides:
   '@vitejs/devtools-kit': '-'
   glob@13: ^14.0.2
   minimatch@10: ^11.0.1
+  seroval: ^1.8.2
 
 importers:
 
@@ -2457,8 +2458,8 @@ packages:
     resolution: {integrity: sha512-FqlEuoTq/zRmA4Lg6aOqyH3lCHbUtCB0bmHCeFniX2GBdDqMJM3FwdvEhlE5Pim1dlt2FfBdVPmUNNiGhhKqpw==}
     engines: {node: '>=20.0.0'}
 
-  seroval@1.7.8:
-    resolution: {integrity: sha512-jmb1u6heSPZW1xP9i95WLGrTjqh4gZWmv9x1BVoh1VXap5R/St2H9qZ3a9rPdYzAUKPi/FrKQ9K80oav5qEZnA==}
+  seroval@1.8.2:
+    resolution: {integrity: sha512-zmMxi/9MdLK1MKazLmIP6Rk39RuK0Xydd+QHeOYntS37olJeTjB3+nwVj4ce/ZWiZJeRhcO5htfxt0mUzQBscQ==}
     engines: {node: '>=20'}
 
   serve-placeholder@2.0.2:
@@ -3634,7 +3635,7 @@ snapshots:
       pkg-types: 2.4.0
       postcss: 8.5.32
       rolldown-string: 0.3.1(rolldown@1.2.19)
-      seroval: 1.7.8
+      seroval: 1.8.2
       std-env: 4.3.0
       ufo: 1.6.4
       unenv: 2.0.0-rc.24
@@ -5694,7 +5695,7 @@ snapshots:
 
   serialize-javascript@7.1.4: {}
 
-  seroval@1.7.8: {}
+  seroval@1.8.2: {}
 
   serve-placeholder@2.0.2:
     dependencies:
