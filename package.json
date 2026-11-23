@@ -11,12 +11,12 @@
     "postinstall": "nuxt prepare"
   },
   "devDependencies": {
-    "@sentry/nuxt": "^11.12.0",
+    "@sentry/nuxt": "^11.16.0",
     "@types/node": "^26.6.6",
     "nuxt": "^4.6.4",
     "tslog": "^5.5.0",
     "typescript": "^5.5.0",
-    "vue": "^3.5.45",
+    "vue": "^3.5.46",
     "vue-tsc": "^3.3.14"
   },
   "packageManager": "pnpm@11.9.0"
