@@ -23,7 +23,7 @@ export function useTemperatureColor() {
     return `hsl(${hueFor(t).toFixed(0)} 24% 11%)`
   }
 
-  /** Saturated fill color used for the 7-day low→high range-bar gradient. */
+  /** Saturated fill color used for the 10-day low→high range-bar gradient. */
   function barColorFor(t: number): string {
     return `hsl(${hueFor(t).toFixed(0)} 68% 56%)`
   }

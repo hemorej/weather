@@ -65,7 +65,7 @@ export interface WeatherData {
   current: WeatherCurrent
   hourly: WeatherHourly[]     // 1-hour intervals, next 24 h
   forecast: WeatherHourly[]   // 1-hour intervals beyond the first 24 h (same Open-Meteo hourly series); backs the "future day clicked" view
-  daily: WeatherDaily[]       // next 7 days
+  daily: WeatherDaily[]       // next 10 days
 }
 
 export interface WeatherCache {

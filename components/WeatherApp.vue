@@ -101,7 +101,7 @@ const indicators = computed(() => {
   if (!weatherData.value) return []
   const c = weatherData.value.current
   return [
-    { key: 'rain',     icon: 'rain',     value: `${c.rain}%`,      label: 'Rain',      accent: false },
+    { key: 'rain',     icon: 'rain',     value: `${c.rain}%`,      label: 'Precip',    accent: false },
     { key: 'wind',     icon: 'wind',     value: `${c.wind} km/h`,  label: `Wind · ${c.windDir}`, accent: false },
     { key: 'humidity', icon: 'humidity', value: `${c.humidity}%`,   label: 'Humidity',  accent: false },
     { key: 'aqi',      icon: 'leaf',     value: String(c.aqi),      label: c.aqiLabel,  accent: false },
@@ -322,7 +322,26 @@ const hourlyLabel = computed(() => {
   return weatherData.value?.daily[selectedDayIdx.value]?.dayLabel ?? 'Hourly'
 })
 
+// A day is clickable when it's today, or when the forecast has hourly entries for it.
+const daysWithHourly = computed(() => {
+  const keys = new Set<string>()
+  for (const h of weatherData.value?.forecast ?? []) {
+    const d = new Date(h.dt * 1000)
+    keys.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`)
+  }
+  return keys
+})
+
+function dayHasHourly(i: number): boolean {
+  if (i === todayDailyIdx.value) return true
+  const day = weatherData.value?.daily[i]
+  if (!day) return false
+  const d = new Date(day.dt * 1000)
+  return daysWithHourly.value.has(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`)
+}
+
 function selectDay(i: number) {
+  if (!dayHasHourly(i)) return
   selectedDayIdx.value = selectedDayIdx.value === i ? null : i
   nextTick(() => {
     hourlyEl.value?.scrollTo({ top: 0 })
@@ -489,16 +508,17 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
         <!-- ── FORECAST COLUMNS ─────────────────────────────────────────────── -->
         <div class="forecast-row" style="flex-shrink:0;display:flex;justify-content:center;gap:60px;margin-top:clamp(40px,7vh,72px);">
 
-          <!-- 7-Day column (left) -->
+          <!-- 10-Day column (left) -->
           <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
-            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:12px;flex-shrink:0;">7-Day</div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:12px;flex-shrink:0;">10-Day</div>
             <div class="nb" style="height:308px;overflow-y:auto;">
               <div
                 v-for="(d, i) in (weatherData?.daily ?? [])"
                 :key="i"
                 class="day-row"
                 :class="{ 'day-row--selected': selectedDayIdx === i && i !== todayDailyIdx }"
-                style="display:grid;grid-template-columns:34px 1fr 34px auto;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid var(--border-row);cursor:pointer;"
+                :style="{ cursor: dayHasHourly(i) ? 'pointer' : 'default' }"
+                style="display:grid;grid-template-columns:34px 1fr 34px auto;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid var(--border-row);"
                 @click="selectDay(i)"
               >
                 <div :style="{ fontSize:'14px', fontWeight: selectedDayIdx === i ? 600 : 500, color:'var(--fg-secondary)', width:'34px' }">{{ d.dayLabel }}</div>
