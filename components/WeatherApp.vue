@@ -521,11 +521,11 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
                 class="day-row"
                 :class="{ 'day-row--selected': selectedDayIdx === i && i !== todayDailyIdx }"
                 :style="{ cursor: dayHasHourly(i) ? 'pointer' : 'default' }"
-                style="display:grid;grid-template-columns:34px 1fr 34px auto;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid var(--border-row);"
+                style="display:grid;grid-template-columns:34px 30px 1fr auto;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid var(--border-row);"
                 @click="selectDay(i)"
               >
                 <div :style="{ fontSize:'14px', fontWeight: selectedDayIdx === i ? 600 : 500, color:'var(--fg-secondary)', width:'34px' }">{{ d.dayLabel }}</div>
-                <div style="display:flex;justify-content:center;color:var(--icon-color);">
+                <div style="display:flex;justify-content:center;color:var(--icon-color);margin-left:8px;">
                   <WeatherIcon :name="dailyIconName(d)" :size="22" />
                 </div>
                 <div style="text-align:right;font-size:11px;font-weight:600;color:var(--accent-rain);">{{ d.precip > 0 ? `${d.precip}%` : '' }}</div>

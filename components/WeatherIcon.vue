@@ -1,5 +1,6 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 })
+const props = withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 })
+const small = computed(() => props.size <= 32)
 </script>
 
 <template>
@@ -68,51 +69,67 @@ withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 })
     <!-- rain -->
     <template v-else-if="name === 'rain'">
       <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
-      <line x1="9"    y1="18" x2="8"    y2="20.6" />
-      <line x1="12.5" y1="18" x2="11.5" y2="20.6" />
-      <line x1="16"   y1="18" x2="15"   y2="20.6" />
+      <line x1="7.5"  y1="18" x2="6.5"  y2="20.6" />
+      <line x1="10.5" y1="18" x2="9.5"  y2="20.6" />
+      <line x1="13.5" y1="18" x2="12.5" y2="20.6" />
+      <line x1="16.5" y1="18" x2="15.5" y2="20.6" />
     </template>
 
-    <!-- drizzle: shorter, lighter strokes than rain -->
+    <!-- drizzle: two rain-style streaks -->
     <template v-else-if="name === 'drizzle'">
       <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
-      <line x1="9"    y1="18.4" x2="8.6"  y2="19.6" />
-      <line x1="12.5" y1="18.4" x2="12.1" y2="19.6" />
-      <line x1="16"   y1="18.4" x2="15.6" y2="19.6" />
-      <line x1="10.7" y1="20.8" x2="10.3" y2="22" />
-      <line x1="14.2" y1="20.8" x2="13.8" y2="22" />
+      <line x1="10.5" y1="18" x2="9.5"  y2="20.6" />
+      <line x1="14.5" y1="18" x2="13.5" y2="20.6" />
     </template>
 
-    <!-- freezing rain / freezing drizzle: rain streaks with an ice dot between -->
+    <!-- freezing rain / freezing drizzle: dash · flake · dash; cloudless when small -->
     <template v-else-if="name === 'freezingRain'">
-      <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
-      <line x1="8.5"  y1="18" x2="7.5"  y2="20.6" />
-      <circle cx="12.2" cy="19.3" r="0.9" fill="currentColor" stroke="none" />
-      <line x1="16"   y1="18" x2="15"   y2="20.6" />
+      <template v-if="small">
+        <line x1="5.92"  y1="8.6" x2="3.68"  y2="15.4" />
+        <path d="M12.2 8.6v6.8M9.26 10.3l5.88 3.4M9.26 13.7l5.88-3.4" />
+        <line x1="20.72" y1="8.6" x2="18.48" y2="15.4" />
+      </template>
+      <template v-else>
+        <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
+        <line x1="9.03"  y1="17.9" x2="7.97"  y2="21.1" />
+        <path d="M12.2 17.6v3.8M10.55 18.55l3.3 1.9M10.55 20.45l3.3-1.9" stroke-width="1.4" />
+        <line x1="16.53" y1="17.9" x2="15.47" y2="21.1" />
+      </template>
     </template>
 
-    <!-- thunderstorm -->
+    <!-- thunderstorm: filled bolt, no cloud when small -->
     <template v-else-if="name === 'storm'">
-      <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
-      <path d="M12.6 14l-2.3 3.5h2.5L11 21.2l4.1-4.4h-2.4L13.9 14Z" />
+      <template v-if="small">
+        <path d="M11.76 3.36L6.24 11.76H12.24L7.92 20.64L17.76 10.08H12L14.88 3.36Z" fill="currentColor" />
+      </template>
+      <template v-else>
+        <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
+        <path d="M12.6 14l-2.3 3.5h2.5L11 21.2l4.1-4.4h-2.4L13.9 14Z" />
+      </template>
     </template>
 
-    <!-- snow -->
+    <!-- snow: two large flakes when small, three under a cloud otherwise -->
     <template v-else-if="name === 'snow'">
-      <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
-      <!-- three small six-arm snowflakes, staggered -->
-      <g stroke-width="1.2">
-        <path d="M8.5 17.3v3.4M7.03 18.15l2.94 1.7M7.03 19.85l2.94-1.7" />
-        <path d="M12.5 19.3v3.4M11.03 20.15l2.94 1.7M11.03 21.85l2.94-1.7" />
-        <path d="M16.5 17.3v3.4M15.03 18.15l2.94 1.7M15.03 19.85l2.94-1.7" />
-      </g>
+      <template v-if="small">
+        <path d="M7.8 4.3v8.6M4.08 6.45l7.44 4.3M4.08 10.75l7.44-4.3" />
+        <path d="M16.2 11.1v8.6M12.48 13.25l7.44 4.3M12.48 17.55l7.44-4.3" />
+      </template>
+      <template v-else>
+        <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
+        <g stroke-width="1.5">
+          <path d="M7.6 16.9v4M5.87 17.9l3.46 2M5.87 19.9l3.46-2" />
+          <path d="M12 19v4M10.27 20l3.46 2M10.27 22l3.46-2" />
+          <path d="M16.4 16.9v4M14.67 17.9l3.46 2M14.67 19.9l3.46-2" />
+        </g>
+      </template>
     </template>
 
     <!-- fog / mist -->
     <template v-else-if="name === 'fog'">
       <path d="M7 13.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 4.7 3.8 3.8 0 0 1 17 13.5H7Z" />
-      <line x1="6"  y1="17" x2="18" y2="17" />
-      <line x1="8"  y1="20" x2="16" y2="20" />
+      <line x1="6"  y1="16.5" x2="18" y2="16.5" />
+      <line x1="8"  y1="19.3" x2="16" y2="19.3" />
+      <line x1="10" y1="22.1" x2="14" y2="22.1" />
     </template>
 
     <!-- rain-probability indicator -->
