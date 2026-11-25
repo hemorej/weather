@@ -513,7 +513,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
 
           <!-- 10-Day column (left) -->
           <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
-            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:12px;flex-shrink:0;">10-Day</div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:12px;flex-shrink:0;">Ten day forecast</div>
             <div class="nb" style="height:308px;overflow-y:auto;">
               <div
                 v-for="(d, i) in (weatherData?.daily ?? [])"
