@@ -45,7 +45,8 @@ const hourlyEl    = ref<HTMLElement | null>(null)
 const cache    = useWeatherCache()
 const storage  = useLocationStorage()
 const geo      = useGeocoding()
-const { tintFor, darkTintFor } = useTemperatureColor()
+const { tintFor, darkTintFor, hueFor } = useTemperatureColor()
+const tintHue = ref(212)
 const { isDark } = useDarkMode()
 
 // Tracks whichever temperature is currently driving bgColor, so the tint can
@@ -55,6 +56,7 @@ const lastTintTemp = ref(20)
 
 function tintForTemp(t: number): string {
   lastTintTemp.value = t
+  tintHue.value = Math.round(hueFor(t))
   return isDark.value ? darkTintFor(t) : tintFor(t)
 }
 
@@ -65,7 +67,7 @@ watch(isDark, () => {
 // ── Date string ───────────────────────────────────────────────────────────────
 const dateStr = computed(() => {
   const now = new Date()
-  const months  = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  const months  = ['Jan.','Feb.','March','April','May','June','July','Aug.','Sept.','Oct.','Nov.','Dec.']
   const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
   return `${weekdays[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`
 })
@@ -398,7 +400,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
 <template>
   <div
     ref="rootEl"
-    :style="{ backgroundColor: bgColor, transition: 'background-color .55s ease' }"
+    :style="{ backgroundColor: bgColor, '--tint-hue': tintHue, transition: 'background-color .55s ease' }"
     :class="{ dark: isDark }"
     class="weather-app"
     style="height:100vh;display:flex;justify-content:center;color:var(--fg-primary);font-family:'Hanken Grotesk',system-ui,-apple-system,sans-serif;overflow:hidden;"
@@ -655,26 +657,26 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
 .weather-app {
   --fg-primary: #111;
   --fg-secondary: #1a1a1a;
-  --fg-tertiary: #9a9a9a;
-  --fg-muted: #b4b4b4;
-  --fg-muted-text: #d4d4d4;
-  --fg-faint: #777;
+  --fg-tertiary: hsl(var(--tint-hue) 14% 40%);
+  --fg-muted: hsl(var(--tint-hue) 14% 42%);
+  --fg-muted-text: hsl(var(--tint-hue) 14% 48%);
+  --fg-faint: hsl(var(--tint-hue) 12% 32%);
   --icon-color: #2a2a2a;
   --fg-bold: #141414;
-  --fg-low: #b0b0b0;
-  --fg-sep: #d2d2d2;
-  --fg-hour-label: #8a8a8a;
-  --fg-winddir: #c2c2c2;
-  --fg-empty: #c0c0c0;
+  --fg-low: hsl(var(--tint-hue) 14% 42%);
+  --fg-sep: hsl(var(--tint-hue) 16% 60%);
+  --fg-hour-label: hsl(var(--tint-hue) 12% 34%);
+  --fg-winddir: hsl(var(--tint-hue) 14% 44%);
+  --fg-empty: hsl(var(--tint-hue) 14% 44%);
   --accent-alert-moderate: #b45309;  /* ECCC yellow  — advisory / special statement */
   --accent-alert: #c2410c;           /* ECCC orange  — watch / warning (default) */
   --accent-alert-extreme: #b91c1c;   /* ECCC red     — severe / extreme warning */
   --accent-rain: #6aa0d4;
   --accent-humidity: #4ba69a;
-  --border-row: #f4f4f4;
-  --border-col: #e8e8e8;
-  --border-divider: #eee;
-  --border-input: #d4d4d4;
+  --border-row: hsl(var(--tint-hue) 30% 25% / 0.12);
+  --border-col: hsl(var(--tint-hue) 30% 25% / 0.16);
+  --border-divider: hsl(var(--tint-hue) 30% 25% / 0.14);
+  --border-input: hsl(var(--tint-hue) 30% 25% / 0.3);
   --surface-card: #fff;
   --surface-hover-a: #f8f8f8;
   --surface-hover-b: #f5f5f5;
