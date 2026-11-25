@@ -45,7 +45,8 @@ const hourlyEl    = ref<HTMLElement | null>(null)
 const cache    = useWeatherCache()
 const storage  = useLocationStorage()
 const geo      = useGeocoding()
-const { tintFor, darkTintFor } = useTemperatureColor()
+const { tintFor, darkTintFor, hueFor } = useTemperatureColor()
+const tintHue = ref(212)
 const { isDark } = useDarkMode()
 
 // Tracks whichever temperature is currently driving bgColor, so the tint can
@@ -55,6 +56,7 @@ const lastTintTemp = ref(20)
 
 function tintForTemp(t: number): string {
   lastTintTemp.value = t
+  tintHue.value = Math.round(hueFor(t))
   return isDark.value ? darkTintFor(t) : tintFor(t)
 }
 
@@ -65,7 +67,7 @@ watch(isDark, () => {
 // ── Date string ───────────────────────────────────────────────────────────────
 const dateStr = computed(() => {
   const now = new Date()
-  const months  = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  const months  = ['Jan.','Feb.','March','April','May','June','July','Aug.','Sept.','Oct.','Nov.','Dec.']
   const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
   return `${weekdays[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`
 })
@@ -101,7 +103,7 @@ const indicators = computed(() => {
   if (!weatherData.value) return []
   const c = weatherData.value.current
   return [
-    { key: 'rain',     icon: 'rain',     value: `${c.rain}%`,      label: 'Precip',    accent: false },
+    { key: 'rain',     icon: 'umbrella', value: `${c.rain}%`,      label: 'Precip',    accent: false },
     { key: 'wind',     icon: 'wind',     value: `${c.wind} km/h`,  label: `Wind · ${c.windDir}`, accent: false },
     { key: 'humidity', icon: 'humidity', value: `${c.humidity}%`,   label: 'Humidity',  accent: false },
     { key: 'aqi',      icon: 'leaf',     value: String(c.aqi),      label: c.aqiLabel,  accent: false },
@@ -141,7 +143,7 @@ const metricUnitLabel = computed(() => selectedMetric.value === 'wind' ? 'km/h' 
 
 const metricUnitIcon = computed(() => {
   switch (selectedMetric.value) {
-    case 'rain':     return 'rain'
+    case 'rain':     return 'umbrella'
     case 'humidity': return 'humidity'
     case 'aqi':      return 'leaf'
     default:         return null
@@ -170,6 +172,12 @@ function condIconName(cond: string, isNight: boolean): string {
   if (cond === 'clear') return isNight ? 'moon' : 'sun'
   if (cond === 'partly') return isNight ? 'partlyNight' : 'partly'
   return cond
+}
+
+const CONDITION_LABELS: Record<string, string> = {
+  sun: 'Clear', moon: 'Clear', partly: 'Partly cloudy', partlyNight: 'Partly cloudy',
+  cloudy: 'Cloudy', rain: 'Rain', drizzle: 'Drizzle', freezingRain: 'Freezing rain',
+  storm: 'Thunderstorm', snow: 'Snow', fog: 'Fog',
 }
 
 // The daily conditionCode is derived from Open-Meteo's WMO weather_code, which
@@ -398,7 +406,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
 <template>
   <div
     ref="rootEl"
-    :style="{ backgroundColor: bgColor, transition: 'background-color .55s ease' }"
+    :style="{ backgroundColor: bgColor, '--tint-hue': tintHue, transition: 'background-color .55s ease' }"
     :class="{ dark: isDark }"
     class="weather-app"
     style="height:100vh;display:flex;justify-content:center;color:var(--fg-primary);font-family:'Hanken Grotesk',system-ui,-apple-system,sans-serif;overflow:hidden;"
@@ -511,7 +519,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
 
           <!-- 10-Day column (left) -->
           <section class="forecast-col" style="width:184px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;">
-            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:12px;flex-shrink:0;">10-Day</div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:12px;flex-shrink:0;">Ten day forecast</div>
             <div class="nb" style="height:308px;overflow-y:auto;">
               <div
                 v-for="(d, i) in (weatherData?.daily ?? [])"
@@ -519,11 +527,11 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
                 class="day-row"
                 :class="{ 'day-row--selected': selectedDayIdx === i && i !== todayDailyIdx }"
                 :style="{ cursor: dayHasHourly(i) ? 'pointer' : 'default' }"
-                style="display:grid;grid-template-columns:34px 1fr 34px auto;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid var(--border-row);"
+                style="display:grid;grid-template-columns:34px 30px 1fr auto;align-items:center;column-gap:8px;height:44px;border-bottom:1px solid var(--border-row);"
                 @click="selectDay(i)"
               >
                 <div :style="{ fontSize:'14px', fontWeight: selectedDayIdx === i ? 600 : 500, color:'var(--fg-secondary)', width:'34px' }">{{ d.dayLabel }}</div>
-                <div style="display:flex;justify-content:center;color:var(--icon-color);">
+                <div class="day-icon" :data-label="CONDITION_LABELS[dailyIconName(d)]" style="display:flex;justify-content:center;color:var(--icon-color);margin-left:8px;">
                   <WeatherIcon :name="dailyIconName(d)" :size="22" />
                 </div>
                 <div style="text-align:right;font-size:11px;font-weight:600;color:var(--accent-rain);">{{ d.precip > 0 ? `${d.precip}%` : '' }}</div>
@@ -655,26 +663,26 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
 .weather-app {
   --fg-primary: #111;
   --fg-secondary: #1a1a1a;
-  --fg-tertiary: #9a9a9a;
-  --fg-muted: #b4b4b4;
-  --fg-muted-text: #d4d4d4;
-  --fg-faint: #777;
+  --fg-tertiary: hsl(var(--tint-hue) 14% 40%);
+  --fg-muted: hsl(var(--tint-hue) 14% 42%);
+  --fg-muted-text: hsl(var(--tint-hue) 14% 48%);
+  --fg-faint: hsl(var(--tint-hue) 12% 32%);
   --icon-color: #2a2a2a;
   --fg-bold: #141414;
-  --fg-low: #b0b0b0;
-  --fg-sep: #d2d2d2;
-  --fg-hour-label: #8a8a8a;
-  --fg-winddir: #c2c2c2;
-  --fg-empty: #c0c0c0;
+  --fg-low: hsl(var(--tint-hue) 14% 42%);
+  --fg-sep: hsl(var(--tint-hue) 16% 60%);
+  --fg-hour-label: hsl(var(--tint-hue) 12% 34%);
+  --fg-winddir: hsl(var(--tint-hue) 14% 44%);
+  --fg-empty: hsl(var(--tint-hue) 14% 44%);
   --accent-alert-moderate: #b45309;  /* ECCC yellow  — advisory / special statement */
   --accent-alert: #c2410c;           /* ECCC orange  — watch / warning (default) */
   --accent-alert-extreme: #b91c1c;   /* ECCC red     — severe / extreme warning */
   --accent-rain: #6aa0d4;
   --accent-humidity: #4ba69a;
-  --border-row: #f4f4f4;
-  --border-col: #e8e8e8;
-  --border-divider: #eee;
-  --border-input: #d4d4d4;
+  --border-row: hsl(var(--tint-hue) 30% 25% / 0.12);
+  --border-col: hsl(var(--tint-hue) 30% 25% / 0.16);
+  --border-divider: hsl(var(--tint-hue) 30% 25% / 0.14);
+  --border-input: hsl(var(--tint-hue) 30% 25% / 0.3);
   --surface-card: #fff;
   --surface-hover-a: #f8f8f8;
   --surface-hover-b: #f5f5f5;
@@ -930,6 +938,29 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
 .alert-fade-leave-active { transition: opacity .2s ease; }
 .alert-fade-enter-from,
 .alert-fade-leave-to { opacity: 0; }
+
+.day-icon { position: relative; }
+.day-icon::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-card);
+  color: var(--fg-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+  z-index: 2;
+}
+@media (hover: hover) { .day-icon:hover::after { opacity: 1; } }
 
 .day-row { transition: background .15s ease; }
 .day-row:hover { background: var(--row-hover); }
