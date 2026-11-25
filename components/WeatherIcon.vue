@@ -73,6 +73,24 @@ withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 })
       <line x1="16"   y1="18" x2="15"   y2="20.6" />
     </template>
 
+    <!-- drizzle: shorter, lighter strokes than rain -->
+    <template v-else-if="name === 'drizzle'">
+      <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
+      <line x1="9"    y1="18.4" x2="8.6"  y2="19.6" />
+      <line x1="12.5" y1="18.4" x2="12.1" y2="19.6" />
+      <line x1="16"   y1="18.4" x2="15.6" y2="19.6" />
+      <line x1="10.7" y1="20.8" x2="10.3" y2="22" />
+      <line x1="14.2" y1="20.8" x2="13.8" y2="22" />
+    </template>
+
+    <!-- freezing rain / freezing drizzle: rain streaks with an ice dot between -->
+    <template v-else-if="name === 'freezingRain'">
+      <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
+      <line x1="8.5"  y1="18" x2="7.5"  y2="20.6" />
+      <circle cx="12.2" cy="19.3" r="0.9" fill="currentColor" stroke="none" />
+      <line x1="16"   y1="18" x2="15"   y2="20.6" />
+    </template>
+
     <!-- thunderstorm -->
     <template v-else-if="name === 'storm'">
       <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />

@@ -177,7 +177,8 @@ function condIconName(cond: string, isNight: boolean): string {
 // day that's 100% likely to rain). Above the threshold, force the rain icon so
 // the icon and the percentage agree.
 function dailyIconName(d: WeatherDaily): string {
-  if (d.precip >= 50 && d.conditionCode !== 'storm') return 'rain'
+  const dry = ['clear', 'partly', 'cloudy', 'fog']
+  if (d.precip >= 50 && dry.includes(d.conditionCode)) return 'rain'
   return condIconName(d.conditionCode, false)
 }
 
