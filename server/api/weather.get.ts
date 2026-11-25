@@ -84,9 +84,8 @@ function toUnixDt(localTimeStr: string, utcOffsetSeconds: number): number {
 
 /**
  * WMO weather-interpretation codes (the `weather_code` field) collapsed onto
- * this app's existing icon-name vocabulary. WeatherIcon.vue has no dedicated
- * snow icon — matching the previous OWM mapping (whose snow icon '13' also
- * fell into 'rain'), snow codes (71-86) map to 'rain' too.
+ * this app's icon-name vocabulary (see WeatherIcon.vue): drizzle, rain,
+ * freezingRain (mixed rain/ice), snow, fog, storm, etc.
  */
 function conditionFromWMO(code: number): string {
   if (code === 0) return 'clear'
@@ -94,7 +93,10 @@ function conditionFromWMO(code: number): string {
   if (code === 3) return 'cloudy'
   if (code === 45 || code === 48) return 'fog'
   if (code >= 95) return 'storm'
-  return 'rain' // drizzle, rain, freezing rain, snow, showers: 51-86
+  if (code >= 51 && code <= 55) return 'drizzle'
+  if (code === 56 || code === 57 || code === 66 || code === 67) return 'freezingRain'
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow'
+  return 'rain' // rain 61-65, rain showers 80-82 (and any unrecognised code)
 }
 
 function windDir(deg: number): string {

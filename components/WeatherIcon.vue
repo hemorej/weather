@@ -73,6 +73,24 @@ withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 })
       <line x1="16"   y1="18" x2="15"   y2="20.6" />
     </template>
 
+    <!-- drizzle: shorter, lighter strokes than rain -->
+    <template v-else-if="name === 'drizzle'">
+      <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
+      <line x1="9"    y1="18.4" x2="8.6"  y2="19.6" />
+      <line x1="12.5" y1="18.4" x2="12.1" y2="19.6" />
+      <line x1="16"   y1="18.4" x2="15.6" y2="19.6" />
+      <line x1="10.7" y1="20.8" x2="10.3" y2="22" />
+      <line x1="14.2" y1="20.8" x2="13.8" y2="22" />
+    </template>
+
+    <!-- freezing rain / freezing drizzle: rain streaks with an ice dot between -->
+    <template v-else-if="name === 'freezingRain'">
+      <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
+      <line x1="8.5"  y1="18" x2="7.5"  y2="20.6" />
+      <circle cx="12.2" cy="19.3" r="0.9" fill="currentColor" stroke="none" />
+      <line x1="16"   y1="18" x2="15"   y2="20.6" />
+    </template>
+
     <!-- thunderstorm -->
     <template v-else-if="name === 'storm'">
       <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
@@ -82,9 +100,12 @@ withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 })
     <!-- snow -->
     <template v-else-if="name === 'snow'">
       <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
-      <circle cx="9"    cy="19"   r="0.6" fill="currentColor" stroke="none" />
-      <circle cx="12.5" cy="20.4" r="0.6" fill="currentColor" stroke="none" />
-      <circle cx="16"   cy="19"   r="0.6" fill="currentColor" stroke="none" />
+      <!-- three small six-arm snowflakes, staggered -->
+      <g stroke-width="1.2">
+        <path d="M8.5 17.3v3.4M7.03 18.15l2.94 1.7M7.03 19.85l2.94-1.7" />
+        <path d="M12.5 19.3v3.4M11.03 20.15l2.94 1.7M11.03 21.85l2.94-1.7" />
+        <path d="M16.5 17.3v3.4M15.03 18.15l2.94 1.7M15.03 19.85l2.94-1.7" />
+      </g>
     </template>
 
     <!-- fog / mist -->

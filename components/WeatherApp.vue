@@ -177,7 +177,8 @@ function condIconName(cond: string, isNight: boolean): string {
 // day that's 100% likely to rain). Above the threshold, force the rain icon so
 // the icon and the percentage agree.
 function dailyIconName(d: WeatherDaily): string {
-  if (d.precip >= 50 && d.conditionCode !== 'storm') return 'rain'
+  const dry = ['clear', 'partly', 'cloudy', 'fog']
+  if (d.precip >= 50 && dry.includes(d.conditionCode)) return 'rain'
   return condIconName(d.conditionCode, false)
 }
 
@@ -338,21 +339,45 @@ function onHourlyScroll() {
   if (!el || !weatherData.value) return
   const hrs = displayedHourly.value
   if (!hrs.length) return
-  const rowH = 44
+  // Measured rather than a fixed 44px: the UI may be zoomed on large screens.
+  const rowH = el.scrollHeight / hrs.length
+  if (!rowH) return
   const idx = Math.max(0, Math.min(hrs.length - 1, Math.round(el.scrollTop / rowH)))
   bgColor.value = tintForTemp(hrs[idx]!.temp)
 }
 
+// ── Large-screen scaling ──────────────────────────────────────────────────────
+// Below an 800x820 viewport the scale is 1 and nothing is applied. Above it the
+// whole UI is zoomed (damped growth, capped at 1.6x). The factor is published
+// as --ui-zoom; `.weather-app > *` consumes it, so overlays that mount later
+// (alert modal, loading skeleton) are scaled too.
+const rootEl = ref<HTMLElement | null>(null)
+
+function applyZoom() {
+  const el = rootEl.value
+  if (!el) return
+  // Damped (45% of the proportional growth) and capped at 1.6x to keep it modest.
+  const raw = Math.min(window.innerWidth / 800, window.innerHeight / 820)
+  const z = Math.max(1, Math.min(1.6, 1 + (raw - 1) * 0.45))
+  if (z > 1.02) el.style.setProperty('--ui-zoom', String(z))
+  else el.style.removeProperty('--ui-zoom')
+}
+
 // ── Mount ─────────────────────────────────────────────────────────────────────
 onMounted(() => {
+  applyZoom()
+  window.addEventListener('resize', applyZoom)
   const saved = storage.load()
   if (saved) location.value = saved
   loadWeather(location.value)
 })
+
+onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
 </script>
 
 <template>
   <div
+    ref="rootEl"
     :style="{ backgroundColor: bgColor, transition: 'background-color .55s ease' }"
     :class="{ dark: isDark }"
     class="weather-app"
@@ -794,6 +819,9 @@ onMounted(() => {
 .retry-btn:hover { background: var(--surface-hover-b); }
 
 .indicator--clickable { cursor: pointer; }
+
+/* Large-screen scaling: --ui-zoom is only set above 800x820 (see applyZoom). */
+.weather-app > * { zoom: var(--ui-zoom, 1); }
 
 .alert-overlay {
   position: fixed;
