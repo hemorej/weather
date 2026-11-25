@@ -7,9 +7,40 @@ import type { WeatherData, GeoLocation, WeatherCache } from '~/types/weather'
 const CACHE_TTL = 10 * 60 * 1000
 const LOCATION_KEY = 'weather_location'
 
+/** Bump whenever the cached `WeatherData` shape changes so old entries are ignored and swept. */
+const CACHE_VERSION = 2
+const CACHE_PREFIX = 'weather_cache_'
+const CURRENT_PREFIX = `${CACHE_PREFIX}v${CACHE_VERSION}_`
+
 /** Cache key rounded to 2 d.p. so nearby successive lookups share the same entry. */
 function cacheKey(lat: number, lon: number): string {
-  return `weather_cache_${lat.toFixed(2)}_${lon.toFixed(2)}`
+  return `${CURRENT_PREFIX}${lat.toFixed(2)}_${lon.toFixed(2)}`
+}
+
+/**
+ * One-time cleanup: removes cache entries from older versions, expired
+ * entries, and anything unparseable. Entries for cities the user never
+ * revisits would otherwise stay in localStorage forever.
+ */
+function sweepCache(): void {
+  if (!import.meta.client) return
+  try {
+    const stale: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key?.startsWith(CACHE_PREFIX)) continue
+      if (!key.startsWith(CURRENT_PREFIX)) { stale.push(key); continue }
+      try {
+        const { timestamp }: WeatherCache = JSON.parse(localStorage.getItem(key)!)
+        if (Date.now() - timestamp > CACHE_TTL) stale.push(key)
+      } catch {
+        stale.push(key)
+      }
+    }
+    stale.forEach(k => localStorage.removeItem(k))
+  } catch {
+    // localStorage unavailable — nothing to sweep
+  }
 }
 
 /**
@@ -43,7 +74,7 @@ export function useWeatherCache() {
     }
   }
 
-  return { get, set }
+  return { get, set, sweep: sweepCache }
 }
 
 /**

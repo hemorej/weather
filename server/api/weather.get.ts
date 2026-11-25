@@ -220,7 +220,7 @@ function buildHourlyEntry(
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 /**
- * Fetches current conditions, hourly (16-day model horizon), 7-day daily
+ * Fetches current conditions, hourly (11-day window), 10-day daily
  * forecast and air quality from Open-Meteo (no API key required), plus
  * active Canadian weather alerts from Environment Canada's public GeoMet
  * API, then shapes the combined result into the app's internal WeatherData
@@ -243,7 +243,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation_probability` +
     `&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation_probability,is_day` +
     `&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_probability_max` +
-    `&timezone=auto&forecast_days=8`
+    `&timezone=auto&forecast_days=11`
   const aqiUrl = `${OPEN_METEO_AQI}?latitude=${lat}&longitude=${lon}&current=european_aqi&hourly=european_aqi&timezone=auto`
 
   try {
@@ -340,7 +340,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     })
 
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const daily = forecast.daily.time.slice(1, 8).map((dateStr, i) => {
+    const daily = forecast.daily.time.slice(1, 11).map((dateStr, i) => {
       const idx = i + 1
       const dt = toUnixDt(dateStr, tzOffset)
       return {

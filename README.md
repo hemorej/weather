@@ -6,7 +6,7 @@ A minimalist single-page weather app built with **Nuxt 4**, **Vue 3**, and **Typ
 
 - Current conditions: temperature, rain probability, wind, humidity, air quality, alerts
 - Horizontally scrollable 24-hour forecast; background tint shifts to match the displayed hour's temperature
-- Vertically scrollable 7-day forecast with animated low→high temperature range bars
+- Vertically scrollable 10-day forecast with animated low→high temperature range bars
 - Inline city search with up to 5 geocoded suggestions, ranked by population
 - Last selected city persisted in `localStorage` across sessions
 - 10-minute client-side cache per location
@@ -77,7 +77,7 @@ weather-app/
 │   ├── useTemperatureColor.ts  # Temperature → hue mapping for tint and range bars
 │   └── useDarkMode.ts      # Auto dark mode: prefers-color-scheme, 7pm–6am fallback
 ├── components/
-│   ├── WeatherApp.vue      # Main UI: header, hourly strip, 7-day list, city search
+│   ├── WeatherApp.vue      # Main UI: header, hourly strip, 10-day list, city search
 │   └── WeatherIcon.vue     # Inline SVG icon set (weather conditions + indicators)
 ├── types/weather.ts        # Shared TypeScript interfaces
 ├── assets/css/global.css   # Resets and scrollbar hiding
