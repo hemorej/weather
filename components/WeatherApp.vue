@@ -385,6 +385,7 @@ function applyZoom() {
 // ── Mount ─────────────────────────────────────────────────────────────────────
 onMounted(() => {
   applyZoom()
+  cache.sweep()
   window.addEventListener('resize', applyZoom)
   const saved = storage.load()
   if (saved) location.value = saved
