@@ -100,9 +100,12 @@ withDefaults(defineProps<{ name: string; size?: number }>(), { size: 22 })
     <!-- snow -->
     <template v-else-if="name === 'snow'">
       <path d="M7 15.5a4 4 0 0 1-.5-7.97A5.4 5.4 0 0 1 17.4 6.7 3.8 3.8 0 0 1 17 15.5H7Z" />
-      <circle cx="9"    cy="19"   r="0.6" fill="currentColor" stroke="none" />
-      <circle cx="12.5" cy="20.4" r="0.6" fill="currentColor" stroke="none" />
-      <circle cx="16"   cy="19"   r="0.6" fill="currentColor" stroke="none" />
+      <!-- three small six-arm snowflakes, staggered -->
+      <g stroke-width="1.2">
+        <path d="M8.5 17.3v3.4M7.03 18.15l2.94 1.7M7.03 19.85l2.94-1.7" />
+        <path d="M12.5 19.3v3.4M11.03 20.15l2.94 1.7M11.03 21.85l2.94-1.7" />
+        <path d="M16.5 17.3v3.4M15.03 18.15l2.94 1.7M15.03 19.85l2.94-1.7" />
+      </g>
     </template>
 
     <!-- fog / mist -->
