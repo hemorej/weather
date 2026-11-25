@@ -132,6 +132,13 @@ const small = computed(() => props.size <= 32)
       <line x1="10" y1="22.1" x2="14" y2="22.1" />
     </template>
 
+    <!-- precipitation indicator -->
+    <template v-else-if="name === 'umbrella'">
+      <path d="M12 4V2.5" />
+      <path d="M3.5 12.5a8.5 8.5 0 0 1 17 0c-1.4-1.2-2.85-1.2-4.25 0-1.4-1.2-2.85-1.2-4.25 0-1.4-1.2-2.85-1.2-4.25 0-1.4-1.2-2.85-1.2-4.25 0Z" />
+      <path d="M12 12.5v6.2a2 2 0 0 1-4 0" />
+    </template>
+
     <!-- rain-probability indicator -->
     <template v-else-if="name === 'droplet'">
       <path d="M12 3.5c3.2 3.6 5.3 6.6 5.3 9.3a5.3 5.3 0 0 1-10.6 0C6.7 10.1 8.8 7.1 12 3.5Z" />

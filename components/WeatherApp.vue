@@ -103,7 +103,7 @@ const indicators = computed(() => {
   if (!weatherData.value) return []
   const c = weatherData.value.current
   return [
-    { key: 'rain',     icon: 'rain',     value: `${c.rain}%`,      label: 'Precip',    accent: false },
+    { key: 'rain',     icon: 'umbrella', value: `${c.rain}%`,      label: 'Precip',    accent: false },
     { key: 'wind',     icon: 'wind',     value: `${c.wind} km/h`,  label: `Wind · ${c.windDir}`, accent: false },
     { key: 'humidity', icon: 'humidity', value: `${c.humidity}%`,   label: 'Humidity',  accent: false },
     { key: 'aqi',      icon: 'leaf',     value: String(c.aqi),      label: c.aqiLabel,  accent: false },
@@ -143,7 +143,7 @@ const metricUnitLabel = computed(() => selectedMetric.value === 'wind' ? 'km/h' 
 
 const metricUnitIcon = computed(() => {
   switch (selectedMetric.value) {
-    case 'rain':     return 'rain'
+    case 'rain':     return 'umbrella'
     case 'humidity': return 'humidity'
     case 'aqi':      return 'leaf'
     default:         return null
@@ -172,6 +172,12 @@ function condIconName(cond: string, isNight: boolean): string {
   if (cond === 'clear') return isNight ? 'moon' : 'sun'
   if (cond === 'partly') return isNight ? 'partlyNight' : 'partly'
   return cond
+}
+
+const CONDITION_LABELS: Record<string, string> = {
+  sun: 'Clear', moon: 'Clear', partly: 'Partly cloudy', partlyNight: 'Partly cloudy',
+  cloudy: 'Cloudy', rain: 'Rain', drizzle: 'Drizzle', freezingRain: 'Freezing rain',
+  storm: 'Thunderstorm', snow: 'Snow', fog: 'Fog',
 }
 
 // The daily conditionCode is derived from Open-Meteo's WMO weather_code, which
@@ -525,7 +531,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
                 @click="selectDay(i)"
               >
                 <div :style="{ fontSize:'14px', fontWeight: selectedDayIdx === i ? 600 : 500, color:'var(--fg-secondary)', width:'34px' }">{{ d.dayLabel }}</div>
-                <div style="display:flex;justify-content:center;color:var(--icon-color);margin-left:8px;">
+                <div class="day-icon" :data-label="CONDITION_LABELS[dailyIconName(d)]" style="display:flex;justify-content:center;color:var(--icon-color);margin-left:8px;">
                   <WeatherIcon :name="dailyIconName(d)" :size="22" />
                 </div>
                 <div style="text-align:right;font-size:11px;font-weight:600;color:var(--accent-rain);">{{ d.precip > 0 ? `${d.precip}%` : '' }}</div>
@@ -932,6 +938,29 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyZoom))
 .alert-fade-leave-active { transition: opacity .2s ease; }
 .alert-fade-enter-from,
 .alert-fade-leave-to { opacity: 0; }
+
+.day-icon { position: relative; }
+.day-icon::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-card);
+  color: var(--fg-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+  z-index: 2;
+}
+@media (hover: hover) { .day-icon:hover::after { opacity: 1; } }
 
 .day-row { transition: background .15s ease; }
 .day-row:hover { background: var(--row-hover); }
