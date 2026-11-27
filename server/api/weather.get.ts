@@ -234,10 +234,12 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
   const rawUrl = event.node.req.url ?? ''
   const qs = rawUrl.includes('?') ? rawUrl.slice(rawUrl.indexOf('?') + 1) : ''
   const params = new URLSearchParams(qs)
-  const lat = params.get('lat') ?? ''
-  const lon = params.get('lon') ?? ''
+  const lat = parseCoordinate(params.get('lat'), 90)
+  const lon = parseCoordinate(params.get('lon'), 180)
 
-  if (!lat || !lon) throw createError({ statusCode: 400, message: 'lat and lon required' })
+  if (lat === null || lon === null) {
+    throw createError({ statusCode: 400, message: 'lat (-90 to 90) and lon (-180 to 180) required' })
+  }
 
   const forecastUrl = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}` +
     `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation_probability` +
@@ -264,7 +266,7 @@ export default defineEventHandler(async (event): Promise<WeatherData> => {
     let alertDetails: WeatherAlertDetail[] = []
     try {
       const eps = 0.05
-      const bbox = `${Number(lon) - eps},${Number(lat) - eps},${Number(lon) + eps},${Number(lat) + eps}`
+      const bbox = `${lon - eps},${lat - eps},${lon + eps},${lat + eps}`
       const alertsRes = await $fetch<GeoMetAlertsResponse>(`${GEOMET_ALERTS}?f=json&bbox=${bbox}`)
 
       // status_en is CAP message lifecycle (issued/continued/ended), not a
