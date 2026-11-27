@@ -8,9 +8,7 @@ overrides:
   '@nuxt/devtools': '-'
   '@vitejs/devtools': '-'
   '@vitejs/devtools-kit': '-'
-  glob@13: ^14.0.2
   minimatch@10: ^11.0.1
-  seroval: ^1.8.2
 
 importers:
 

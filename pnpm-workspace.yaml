@@ -11,33 +11,8 @@ allowBuilds:
 minimumReleaseAge: 4320
 # Exceptions for packages where we need to react fast (e.g. security
 # patches you've manually verified): add the package name here.
-# Temporary: nuxt 4.7.0 security fix (GHSA-jxc9-w3j6-pwp2, GHSA-vrh2-cfcx-c3fg,
-# GHSA-h5xj-x893-p5f7) and its fresh deps. Remove once they are 3 days old.
-minimumReleaseAgeExclude:
-  - '@colordx/core'
-  - '@nuxt/cli'
-  - '@nuxt/kit'
-  - '@nuxt/nitro-server'
-  - '@nuxt/nitro-v3-server'
-  - '@nuxt/schema'
-  - '@nuxt/vite-builder'
-  - '@nuxt/vite-server'
-  - '@unhead/bundler'
-  - '@unhead/vue'
-  - '@vercel/nft'
-  - bare-fs
-  - caniuse-lite
-  - devalue
-  - electron-to-chromium
-  - my-bad
-  - nitropack
-  - node-forge
-  - nuxt
-  - rollup-plugin-visualizer
-  - tar-stream
-  - unhead
-  - unrouting
-  - vite-plugin-checker
+# minimumReleaseAgeExclude:
+#   - some-package
 
 # Security overrides for transitive deps flagged by Dependabot.
 # Remove once nuxt pulls in patched versions.
@@ -45,9 +20,7 @@ overrides:
   '@nuxt/devtools': '-'
   '@vitejs/devtools': '-'
   '@vitejs/devtools-kit': '-'
-  glob@13: '^14.0.2'
   minimatch@10: '^11.0.1'
-  seroval: '^1.8.2'
 
 # Build/dev-time only transitive deps of nuxt > nitropack (listhen dev server,
 # globby file matching); neither ships in .output. Remove once patched upstream.
