@@ -64,6 +64,24 @@ watch(isDark, () => {
   bgColor.value = tintForTemp(lastTintTemp.value)
 })
 
+// ── Browser chrome colour ─────────────────────────────────────────────────────
+// Keeps the browser's top bar matched to whatever is on screen: the loading
+// overlay's base colour while it covers the page, the temperature tint after.
+// `theme-color` covers most browsers; Safari 26+ ignores it and reads the page
+// background instead, hence the style on <html>.
+const chromeColor = computed(() => {
+  if (showLoading.value && !error.value) {
+    // Mirrors --load-overlay-bg in the styles below.
+    return isDark.value ? 'hsl(212 26% 12%)' : 'hsl(212 44% 95%)'
+  }
+  return bgColor.value
+})
+
+useHead({
+  htmlAttrs: { style: () => `background-color: ${chromeColor.value}` },
+  meta: [{ name: 'theme-color', content: chromeColor }],
+})
+
 // ── Date string ───────────────────────────────────────────────────────────────
 const dateStr = computed(() => {
   const now = new Date()
